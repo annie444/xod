@@ -12,6 +12,12 @@ use std::{
 #[derive(Clone, Debug)]
 pub struct BitOpsParser;
 
+impl Default for BitOpsParser {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl BitOpsParser {
     pub fn new() -> Self {
         Self
@@ -66,6 +72,12 @@ Valid operators are:
 
 #[derive(Clone, Debug)]
 pub struct NumberParser;
+
+impl Default for NumberParser {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl NumberParser {
     pub fn new() -> Self {

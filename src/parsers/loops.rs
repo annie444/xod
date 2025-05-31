@@ -129,14 +129,14 @@ pub fn loops(input: Span) -> IResult<Span, Loop> {
     .parse(input)
 }
 
-pub fn loop_body<'a>(input: Span<'a>) -> IResult<Span<'a>, (VecDeque<Line<'a>>, Span<'a>)> {
+pub fn loop_body(input: Span<'_>) -> IResult<Span<'_>, (VecDeque<Line<'_>>, Span<'_>)> {
     if *DEBUG_PRINT {
         eprintln!("Parsing input for the lines for the loop body:{}", input);
     }
     let (input, loop_input) = take_till1(|c| c == '}').parse(input)?;
     let (input, brace) = close_brace(input)?;
     let (_, i) = lines(loop_input)?;
-    Ok((input, (i.into(), brace)))
+    Ok((input, (i, brace)))
 }
 
 #[cfg(test)]

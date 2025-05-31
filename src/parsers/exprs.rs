@@ -27,13 +27,13 @@ fn get_var<'a>(var: &'a Span<'a>) -> Result<usize, PartialEvalError<'a>> {
     }
 }
 
-impl<'a> Expression<usize> for Number<'a> {
+impl Expression<usize> for Number<'_> {
     fn eval(&mut self) -> Result<usize, super::PartialEvalError> {
         Ok(self.0)
     }
 }
 
-impl<'a> Expression<usize> for BitExpr<'a> {
+impl Expression<usize> for BitExpr<'_> {
     fn eval(&mut self) -> Result<usize, super::PartialEvalError> {
         let left = self.left.eval()?;
         match self.op {
@@ -61,7 +61,7 @@ impl<'a> Expression<usize> for BitExpr<'a> {
     }
 }
 
-impl<'a> Expression<usize> for VarNum<'a> {
+impl Expression<usize> for VarNum<'_> {
     fn eval(&mut self) -> Result<usize, super::PartialEvalError> {
         match self {
             Self::Var(var) => get_var(var),
@@ -71,7 +71,7 @@ impl<'a> Expression<usize> for VarNum<'a> {
     }
 }
 
-impl<'a> Expression<usize> for SepBitExpr<'a> {
+impl Expression<usize> for SepBitExpr<'_> {
     fn eval(&mut self) -> Result<usize, super::PartialEvalError> {
         self.expr.eval()
     }

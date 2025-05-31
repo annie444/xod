@@ -23,7 +23,7 @@ fn from_decimal(input: Span) -> Result<(usize, Span), std::num::ParseIntError> {
 }
 
 fn is_hex_digit(c: char) -> bool {
-    c.is_digit(16)
+    c.is_ascii_hexdigit()
 }
 
 fn is_bin_digit(c: char) -> bool {
@@ -35,7 +35,7 @@ fn is_oct_digit(c: char) -> bool {
 }
 
 fn is_dec_digit(c: char) -> bool {
-    c.is_digit(10)
+    c.is_ascii_digit()
 }
 
 fn get_hex_num(input: Span) -> IResult<Span, (usize, Span)> {

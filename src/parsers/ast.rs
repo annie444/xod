@@ -5,7 +5,7 @@ use std::{collections::VecDeque, fmt};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Number<'a>(pub usize, pub Span<'a>, pub Option<Span<'a>>);
 
-impl<'a> std::fmt::Display for Number<'a> {
+impl std::fmt::Display for Number<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(span) = &self.2 {
             write!(f, "{}{}", span.fragment(), self.1.fragment())
@@ -51,7 +51,7 @@ pub struct Range<'a> {
     pub end: VarNum<'a>,
 }
 
-impl<'a> std::fmt::Display for Range<'a> {
+impl std::fmt::Display for Range<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}..{}", self.start, self.end)
     }
@@ -70,7 +70,7 @@ pub enum Iter<'a> {
     Var(Span<'a>),
 }
 
-impl<'a> fmt::Display for Iter<'a> {
+impl fmt::Display for Iter<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::List(l) => {
@@ -116,13 +116,13 @@ pub struct Loop<'a> {
     pub close: Span<'a>,
 }
 
-impl<'a> fmt::Display for Loop<'a> {
+impl fmt::Display for Loop<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.kind)?;
         for line in &self.body {
             write!(f, "    {}", line)?;
         }
-        write!(f, "}}\n")
+        writeln!(f, "}}")
     }
 }
 
@@ -179,12 +179,12 @@ pub enum Loops<'a> {
     If(Span<'a>, CompareOp<'a>),
 }
 
-impl<'a> fmt::Display for Loops<'a> {
+impl fmt::Display for Loops<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::For(_, span, iter) => write!(f, "for ({} in {}) {{\n", span.fragment(), iter),
-            Self::While(_, cond) => write!(f, "while ({}) {{\n", cond),
-            Self::If(_, cond) => write!(f, "if ({}) {{\n", cond),
+            Self::For(_, span, iter) => writeln!(f, "for ({} in {}) {{", span.fragment(), iter),
+            Self::While(_, cond) => writeln!(f, "while ({}) {{", cond),
+            Self::If(_, cond) => writeln!(f, "if ({}) {{", cond),
         }
     }
 }
@@ -195,7 +195,7 @@ pub struct Variable<'a> {
     pub value: VarOrVal<'a>,
 }
 
-impl<'a> fmt::Display for Variable<'a> {
+impl fmt::Display for Variable<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{} = {}", self.name.fragment(), self.value)
     }
@@ -218,7 +218,7 @@ pub enum VarOrVal<'a> {
     Func(Funcs<'a>),
 }
 
-impl<'a> fmt::Display for VarOrVal<'a> {
+impl fmt::Display for VarOrVal<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Var(v) => write!(f, "{}", v.fragment()),
@@ -293,7 +293,7 @@ pub enum VarNum<'a> {
     Expr(Box<SepBitExpr<'a>>),
 }
 
-impl<'a> fmt::Display for VarNum<'a> {
+impl fmt::Display for VarNum<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Var(v) => write!(f, "{}", v.fragment()),
@@ -351,13 +351,13 @@ pub enum Line<'a> {
     Loop(Loop<'a>),
 }
 
-impl<'a> fmt::Display for Line<'a> {
+impl fmt::Display for Line<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Empty => write!(f, "\n"),
-            Self::Variable(v) => write!(f, "{};\n", v),
-            Self::Expr(e) => write!(f, "{};\n", e),
-            Self::Comp(c) => write!(f, "{};\n", c),
+            Self::Empty => writeln!(f),
+            Self::Variable(v) => writeln!(f, "{};", v),
+            Self::Expr(e) => writeln!(f, "{};", e),
+            Self::Comp(c) => writeln!(f, "{};", c),
             Self::Func(u) => write!(f, "{};", u),
             Self::Loop(l) => write!(f, "{};", l),
         }
@@ -401,7 +401,7 @@ pub enum Funcs<'a> {
     Run(Span<'a>),
 }
 
-impl<'a> fmt::Display for Funcs<'a> {
+impl fmt::Display for Funcs<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Bool(_, i) => write!(f, "bool({})", i),
@@ -417,7 +417,7 @@ pub enum BoolFunc<'a> {
     VarNum(VarNum<'a>),
 }
 
-impl<'a> fmt::Display for BoolFunc<'a> {
+impl fmt::Display for BoolFunc<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Compare(c) => write!(f, "{}", c),
@@ -469,7 +469,7 @@ pub struct CompareOp<'a> {
     pub right: VarNum<'a>,
 }
 
-impl<'a> fmt::Display for CompareOp<'a> {
+impl fmt::Display for CompareOp<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{} {} {}", self.left, self.op, self.right)
     }
@@ -505,7 +505,7 @@ impl<'a> BitExpr<'a> {
     }
 }
 
-impl<'a> std::fmt::Display for BitExpr<'a> {
+impl std::fmt::Display for BitExpr<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(right) = &self.right {
             write!(f, "{} {} {}", self.left, self.op, right)
@@ -528,7 +528,7 @@ impl<'a> SepBitExpr<'a> {
     }
 }
 
-impl<'a> fmt::Display for SepBitExpr<'a> {
+impl fmt::Display for SepBitExpr<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,

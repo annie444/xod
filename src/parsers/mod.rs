@@ -14,7 +14,7 @@ use std::collections::BTreeMap;
 use std::sync::Mutex;
 use std::{fmt, option_env, sync::LazyLock};
 
-pub const VARIABLES: Mutex<BTreeMap<&'static str, usize>> = Mutex::new(BTreeMap::new());
+pub static VARIABLES: Mutex<BTreeMap<&'static str, usize>> = Mutex::new(BTreeMap::new());
 
 pub static DEBUG_PRINT: LazyLock<bool> =
     LazyLock::new(|| option_env!("PARSE_DEBUG").map(|_| true).unwrap_or(false));
@@ -48,7 +48,7 @@ pub struct EvalError<'a> {
     pub fix: String,
 }
 
-impl<'a> fmt::Display for EvalError<'a> {
+impl fmt::Display for EvalError<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         cwriteln!(f, "<s><r!>error</>: {}</>", self.msg)?;
         let start = self.loc.naive_get_utf8_column();
