@@ -1,0 +1,17 @@
+[package]
+name = "xod"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.98"
+backtrace = { version = "0.3.75", features = ["dbghelp", "coresymbolication"] }
+clap = { version = "4.5.39", features = ["derive"] }
+color-print = { version = "0.3.7", features = ["terminfo"] }
+lazy_static = "1.5.0"
+nom = "8.0.0"
+nom_locate = { version = "5.0.0", features = ["runtime-dispatch-simd"] }
+thiserror = "2.0.12"
+
+[dev-dependencies]
+anyhow = { version = "1.0.98", features = ["backtrace"] }
