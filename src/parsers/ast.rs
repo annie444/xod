@@ -2,7 +2,7 @@ use super::Span;
 use crate::bitops::BitOps;
 use std::{collections::VecDeque, fmt};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Number<'a>(pub usize, pub Span<'a>, pub Option<Span<'a>>);
 
 impl std::fmt::Display for Number<'_> {
@@ -293,6 +293,31 @@ pub enum VarNum<'a> {
     Expr(Box<SepBitExpr<'a>>),
 }
 
+impl<'a> VarNum<'a> {
+    pub fn is_var(&self) -> bool {
+        matches!(self, Self::Var(_))
+    }
+
+    pub fn is_num(&self) -> bool {
+        matches!(self, Self::Num(_))
+    }
+
+    pub fn is_expr(&self) -> bool {
+        matches!(self, Self::Expr(_))
+    }
+
+    pub fn fragment<'b>(&self) -> Span<'b>
+    where
+        'a: 'b,
+    {
+        match self {
+            Self::Var(v) => *v,
+            Self::Num(n) => n.1,
+            Self::Expr(e) => e.open,
+        }
+    }
+}
+
 impl fmt::Display for VarNum<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -398,7 +423,6 @@ impl<'a> From<Loop<'a>> for Line<'a> {
 pub enum Funcs<'a> {
     Bool(Span<'a>, BoolFunc<'a>),
     Quit(Span<'a>),
-    Run(Span<'a>),
 }
 
 impl fmt::Display for Funcs<'_> {
@@ -406,7 +430,6 @@ impl fmt::Display for Funcs<'_> {
         match self {
             Self::Bool(_, i) => write!(f, "bool({})", i),
             Self::Quit(_) => write!(f, "quit()"),
-            Self::Run(_) => write!(f, "run()"),
         }
     }
 }

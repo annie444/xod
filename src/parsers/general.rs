@@ -6,15 +6,16 @@ use super::{
     funcs::funcs,
     loops::{list, loops, range},
     numbers::num,
+    utils::{opt_multispace0, space_around},
 };
 use nom::{
     IResult, Parser,
     branch::alt,
-    bytes::complete::{tag, take},
-    character::complete::{alpha1, alphanumeric1, char, multispace0},
-    combinator::{into, recognize},
-    multi::many0,
-    sequence::{delimited, pair},
+    bytes::complete::tag,
+    character::complete::{alpha1, alphanumeric1, char, newline},
+    combinator::{eof, into, recognize},
+    multi::{many0, many1},
+    sequence::{pair, terminated},
 };
 use std::collections::VecDeque;
 
@@ -22,7 +23,7 @@ pub fn assign(input: Span) -> IResult<Span, char> {
     if *DEBUG_PRINT {
         eprintln!("Parsing input for a assignment char:{}", input);
     }
-    char('=').parse(input)
+    char('=').parse_complete(input)
 }
 
 pub fn var_name(input: Span) -> IResult<Span, Span> {
@@ -33,14 +34,14 @@ pub fn var_name(input: Span) -> IResult<Span, Span> {
         alt((alpha1, tag("_"))),
         many0(alt((alphanumeric1, tag("_")))),
     ))
-    .parse(input)
+    .parse_complete(input)
 }
 
 pub fn var_or_num(input: Span) -> IResult<Span, VarNum> {
     if *DEBUG_PRINT {
         eprintln!("Parsing input for a VarNum:{}", input);
     }
-    alt((into(num), into(var_name), into(sep_expr))).parse(input)
+    alt((into(num), into(var_name), into(sep_expr))).parse_complete(input)
 }
 
 pub fn var_or_val(input: Span) -> IResult<Span, VarOrVal> {
@@ -56,27 +57,22 @@ pub fn var_or_val(input: Span) -> IResult<Span, VarOrVal> {
         into(expr),
         into(sep_expr),
     ))
-    .parse(input)
+    .parse_complete(input)
 }
 
 pub fn variable(input: Span) -> IResult<Span, Variable> {
     if *DEBUG_PRINT {
         eprintln!("Parsing input for a variable assignment:{}", input);
     }
-    let (input, _) = multispace0(input)?;
-    let (input, name) = var_name(input)?;
-    let (input, _) = multispace0(input)?;
-    let (input, _) = assign(input)?;
-    let (input, _) = multispace0(input)?;
+    let (input, name) = space_around(var_name).parse_complete(input)?;
+    let (input, _) = space_around(assign).parse_complete(input)?;
     let (input, value) = var_or_val(input)?;
     Ok((input, Variable::new(name, value)))
 }
 
 pub fn empty_line(input: Span) -> IResult<Span, Line> {
-    if input.fragment().is_empty() {
-        Ok((input, Line::Empty))
-    } else if input.fragment() == &";" || input.fragment() == &"{" || input.fragment() == &"}" {
-        let (input, _) = take(1usize)(input)?;
+    let (input, _) = opt_multispace0.parse_complete(input)?;
+    if input.fragment().split_whitespace().all(|s| s.is_empty()) {
         Ok((input, Line::Empty))
     } else {
         Err(nom::Err::Error(nom::error::Error::new(
@@ -90,26 +86,25 @@ pub fn line(input: Span) -> IResult<Span, Line> {
     if *DEBUG_PRINT {
         eprintln!("Parsing input for a line:{}", input);
     }
-    delimited(
-        multispace0,
+    terminated(
         alt((
+            empty_line,
             into(variable),
             into(compare),
             into(funcs),
             into(expr),
             into(loops),
-            empty_line,
         )),
-        multispace0,
+        newline,
     )
-    .parse(input)
+    .parse_complete(input)
 }
 
 pub fn lines(input: Span) -> IResult<Span, VecDeque<Line>> {
     if *DEBUG_PRINT {
         eprintln!("Parsing input for many lines:{}", input);
     }
-    into(many0(line)).parse(input)
+    terminated(into(many1(line)), eof).parse_complete(input)
 }
 
 #[cfg(test)]
@@ -238,48 +233,47 @@ mod test {
                 )),
             )));
             l.push_back(Line::Variable(Variable::new(
-                Span::new_from_raw_offset(12, 3, "j", ()),
+                Span::new_from_raw_offset(11, 3, "j", ()),
                 VarOrVal::Num(Number::new(
                     400,
-                    Span::new_from_raw_offset(16, 3, "400", ()),
+                    Span::new_from_raw_offset(15, 3, "400", ()),
                     None,
                 )),
             )));
             l.push_back(Line::Expr(BitExpr::new(
                 VarNum::Expr(Box::new(SepBitExpr::new(
-                    Span::new_from_raw_offset(21, 4, "(", ()),
+                    Span::new_from_raw_offset(19, 4, "(", ()),
                     BitExpr::new(
-                        VarNum::Var(Span::new_from_raw_offset(23, 4, "i", ())),
+                        VarNum::Var(Span::new_from_raw_offset(21, 4, "i", ())),
                         BitOps::RightShift,
-                        Span::new_from_raw_offset(25, 4, ">>", ()),
-                        Some(VarNum::Var(Span::new_from_raw_offset(28, 4, "j", ()))),
+                        Span::new_from_raw_offset(23, 4, ">>", ()),
+                        Some(VarNum::Var(Span::new_from_raw_offset(26, 4, "j", ()))),
                     ),
-                    Span::new_from_raw_offset(30, 4, ")", ()),
+                    Span::new_from_raw_offset(28, 4, ")", ()),
                 ))),
                 BitOps::Or,
-                Span::new_from_raw_offset(32, 4, "|", ()),
+                Span::new_from_raw_offset(30, 4, "|", ()),
                 Some(VarNum::Num(Number::new(
                     42,
-                    Span::new_from_raw_offset(36, 4, "101010", ()),
-                    Some(Span::new_from_raw_offset(34, 4, "0b", ())),
+                    Span::new_from_raw_offset(34, 4, "101010", ()),
+                    Some(Span::new_from_raw_offset(32, 4, "0b", ())),
                 ))),
             )));
-            l.push_back(Line::Func(Funcs::Run(Span::new_from_raw_offset(
-                44,
+            l.push_back(Line::Func(Funcs::Quit(Span::new_from_raw_offset(
+                41,
                 5,
-                "exec",
+                "exit",
                 (),
             ))));
-            l.push_back(Line::Empty);
             let test = lines(Span::new(
                 r#"
-i = 0x800;
-j = 400;
-( i >> j ) | 0b101010;
-exec();
+i = 0x800
+j = 400
+( i >> j ) | 0b101010
+exit()
 "#,
             ));
-            assert_eq!(test, Ok((Span::new_from_raw_offset(52, 6, "", ()), l)))
+            assert_eq!(test, Ok((Span::new_from_raw_offset(48, 6, "", ()), l)))
         }
     }
 }

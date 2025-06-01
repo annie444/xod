@@ -2,36 +2,37 @@ use super::{
     DEBUG_PRINT, Span,
     ast::{Compare, CompareOp},
     general::var_or_num,
+    utils::space_around,
 };
-use nom::{IResult, Parser, branch::alt, bytes::complete::tag, character::complete::multispace0};
+use nom::{IResult, Parser, branch::alt, bytes::complete::tag};
 
 pub fn equals(input: Span) -> IResult<Span, (Compare, Span)> {
-    let (input, op) = tag("==").parse(input)?;
+    let (input, op) = tag("==").parse_complete(input)?;
     Ok((input, (Compare::Equal, op)))
 }
 
 pub fn not_equals(input: Span) -> IResult<Span, (Compare, Span)> {
-    let (input, op) = tag("!=").parse(input)?;
+    let (input, op) = tag("!=").parse_complete(input)?;
     Ok((input, (Compare::NotEqual, op)))
 }
 
 pub fn greater(input: Span) -> IResult<Span, (Compare, Span)> {
-    let (input, op) = tag(">").parse(input)?;
+    let (input, op) = tag(">").parse_complete(input)?;
     Ok((input, (Compare::Greater, op)))
 }
 
 pub fn greater_equal(input: Span) -> IResult<Span, (Compare, Span)> {
-    let (input, op) = tag(">=").parse(input)?;
+    let (input, op) = tag(">=").parse_complete(input)?;
     Ok((input, (Compare::GreaterEqual, op)))
 }
 
 pub fn lesser(input: Span) -> IResult<Span, (Compare, Span)> {
-    let (input, op) = tag("<").parse(input)?;
+    let (input, op) = tag("<").parse_complete(input)?;
     Ok((input, (Compare::Less, op)))
 }
 
 pub fn lesser_equal(input: Span) -> IResult<Span, (Compare, Span)> {
-    let (input, op) = tag("<=").parse(input)?;
+    let (input, op) = tag("<=").parse_complete(input)?;
     Ok((input, (Compare::LessEqual, op)))
 }
 
@@ -47,18 +48,15 @@ pub fn operator(input: Span) -> IResult<Span, (Compare, Span)> {
         greater,
         lesser,
     ))
-    .parse(input)
+    .parse_complete(input)
 }
 
 pub fn compare(input: Span) -> IResult<Span, CompareOp> {
     if *DEBUG_PRINT {
         eprintln!("Parsing input for a boolean expression:{}", input);
     }
-    let (input, _) = multispace0(input)?;
-    let (input, left) = var_or_num(input)?;
-    let (input, _) = multispace0(input)?;
-    let (input, (op, op_span)) = operator(input)?;
-    let (input, _) = multispace0(input)?;
+    let (input, left) = space_around(var_or_num).parse_complete(input)?;
+    let (input, (op, op_span)) = space_around(operator).parse_complete(input)?;
     let (input, right) = var_or_num(input)?;
     Ok((input, CompareOp::new(left, op, op_span, right)))
 }

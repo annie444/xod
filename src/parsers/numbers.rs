@@ -1,9 +1,10 @@
-use super::{DEBUG_PRINT, Span, ast::Number};
+use super::{DEBUG_PRINT, Span, ast::Number, utils::opt_multispace0};
 use nom::{
     IResult, Parser,
     branch::alt,
     bytes::complete::{tag, take_while},
     combinator::map_res,
+    sequence::preceded,
 };
 
 fn from_hex(input: Span) -> Result<(usize, Span), std::num::ParseIntError> {
@@ -39,31 +40,31 @@ fn is_dec_digit(c: char) -> bool {
 }
 
 fn get_hex_num(input: Span) -> IResult<Span, (usize, Span)> {
-    map_res(take_while(is_hex_digit), from_hex).parse(input)
+    map_res(take_while(is_hex_digit), from_hex).parse_complete(input)
 }
 
 fn get_oct_num(input: Span) -> IResult<Span, (usize, Span)> {
-    map_res(take_while(is_oct_digit), from_octal).parse(input)
+    map_res(take_while(is_oct_digit), from_octal).parse_complete(input)
 }
 
 fn get_bin_num(input: Span) -> IResult<Span, (usize, Span)> {
-    map_res(take_while(is_bin_digit), from_binary).parse(input)
+    map_res(take_while(is_bin_digit), from_binary).parse_complete(input)
 }
 
 fn get_dec_num(input: Span) -> IResult<Span, (usize, Span)> {
-    map_res(take_while(is_dec_digit), from_decimal).parse(input)
+    map_res(take_while(is_dec_digit), from_decimal).parse_complete(input)
 }
 
 fn hex_tag(input: Span) -> IResult<Span, Span> {
-    alt((tag("0x"), tag("0X"))).parse(input)
+    alt((tag("0x"), tag("0X"))).parse_complete(input)
 }
 
 fn oct_tag(input: Span) -> IResult<Span, Span> {
-    alt((tag("0o"), tag("0O"))).parse(input)
+    alt((tag("0o"), tag("0O"))).parse_complete(input)
 }
 
 fn bin_tag(input: Span) -> IResult<Span, Span> {
-    alt((tag("0b"), tag("0B"))).parse(input)
+    alt((tag("0b"), tag("0B"))).parse_complete(input)
 }
 
 pub fn hex_num(input: Span) -> IResult<Span, Number> {
@@ -80,7 +81,7 @@ pub fn oct_num(input: Span) -> IResult<Span, Number> {
         eprintln!("Parsing input for a octal number:{}", input);
     }
     let (input, span1) = oct_tag(input)?;
-    let (input, (number, span2)) = (get_oct_num).parse(input)?;
+    let (input, (number, span2)) = (get_oct_num).parse_complete(input)?;
     Ok((input, Number::new(number, span2, Some(span1))))
 }
 
@@ -89,7 +90,7 @@ pub fn bin_num(input: Span) -> IResult<Span, Number> {
         eprintln!("Parsing input for a binary number:{}", input);
     }
     let (input, span1) = bin_tag(input)?;
-    let (input, (number, span2)) = (get_bin_num).parse(input)?;
+    let (input, (number, span2)) = (get_bin_num).parse_complete(input)?;
     Ok((input, Number::new(number, span2, Some(span1))))
 }
 
@@ -97,7 +98,7 @@ pub fn dec_num(input: Span) -> IResult<Span, Number> {
     if *DEBUG_PRINT {
         eprintln!("Parsing input for a decimal number:{}", input);
     }
-    let (input, (number, span)) = (get_dec_num).parse(input)?;
+    let (input, (number, span)) = (get_dec_num).parse_complete(input)?;
     Ok((input, Number::new(number, span, None)))
 }
 
@@ -105,7 +106,7 @@ pub fn num(input: Span) -> IResult<Span, Number> {
     if *DEBUG_PRINT {
         eprintln!("Parsing input for a number:{}", input);
     }
-    alt((hex_num, oct_num, bin_num, dec_num)).parse(input)
+    preceded(opt_multispace0, alt((hex_num, oct_num, bin_num, dec_num))).parse_complete(input)
 }
 
 #[cfg(test)]

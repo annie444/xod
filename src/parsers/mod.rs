@@ -8,18 +8,33 @@ pub mod loops;
 pub mod numbers;
 pub mod utils;
 
+use self::exprs::NumOrList;
 use color_print::{cformat, cwriteln};
 use nom_locate::LocatedSpan;
 use std::collections::BTreeMap;
 use std::sync::Mutex;
 use std::{fmt, option_env, sync::LazyLock};
 
-pub static VARIABLES: Mutex<BTreeMap<&'static str, usize>> = Mutex::new(BTreeMap::new());
+pub static VARIABLES: Mutex<BTreeMap<String, NumOrList>> = Mutex::new(BTreeMap::new());
 
 pub static DEBUG_PRINT: LazyLock<bool> =
     LazyLock::new(|| option_env!("PARSE_DEBUG").map(|_| true).unwrap_or(false));
 
 pub type Span<'a> = LocatedSpan<&'a str>;
+
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum ExprError<'a> {
+    #[error("{0}")]
+    Partial(PartialEvalError<'a>),
+    #[error("Exiting...")]
+    Quit,
+}
+
+impl<'a> From<PartialEvalError<'a>> for ExprError<'a> {
+    fn from(value: PartialEvalError<'a>) -> Self {
+        Self::Partial(value)
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[error("Error parsing {loc:#?}. {msg} {fix}")]
@@ -86,6 +101,10 @@ impl fmt::Display for EvalError<'_> {
     }
 }
 
-pub trait Expression<T> {
-    fn eval(&mut self) -> Result<T, PartialEvalError>;
+pub trait Expression<'a, 'b, T>
+where
+    'a: 'b,
+    T: 'a,
+{
+    fn eval(&'b mut self) -> Result<T, ExprError<'a>>;
 }

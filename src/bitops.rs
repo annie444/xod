@@ -2,7 +2,7 @@ use crate::cli_parser::BitOpsParser;
 use clap::builder::ValueParserFactory;
 use std::fmt;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BitOps {
     And,
     Or,

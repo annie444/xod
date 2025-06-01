@@ -2,16 +2,16 @@ use super::{
     DEBUG_PRINT, Span,
     ast::{Iter, Line, Loop, Loops, Range, VarNum},
     compare::compare,
-    general::{lines, var_name, var_or_num},
+    general::{line, var_name, var_or_num},
     utils::{close_brace, close_bracket, close_paren, comma, open_brace, open_bracket, open_paren},
 };
 use nom::{
     IResult, Parser,
     branch::alt,
-    bytes::{complete::tag, streaming::take_till1},
-    character::streaming::multispace0,
+    bytes::complete::{tag, take_till1},
+    character::complete::multispace0,
     combinator::{into, opt},
-    multi::separated_list1,
+    multi::{many1, separated_list0},
     sequence::{delimited, preceded},
 };
 use std::collections::VecDeque;
@@ -28,7 +28,7 @@ pub fn for_loop(input: Span) -> IResult<Span, Loop> {
             open_brace,
         ),
     )
-    .parse(input)?;
+    .parse_complete(input)?;
     let (input, (body, close)) = loop_body(input)?;
     let l = Loop::new_with_body(
         Loops::For(loop_tag, inner_name, loop_val),
@@ -45,10 +45,10 @@ pub fn list(input: Span) -> IResult<Span, VecDeque<VarNum>> {
     }
     let (input, list) = delimited(
         open_bracket,
-        separated_list1(comma, var_or_num),
+        separated_list0(comma, var_or_num),
         close_bracket,
     )
-    .parse(input)?;
+    .parse_complete(input)?;
     Ok((input, list.into()))
 }
 
@@ -56,13 +56,13 @@ pub fn range(input: Span) -> IResult<Span, Range> {
     if *DEBUG_PRINT {
         eprintln!("Parsing input for a range:{}", input);
     }
-    let (input, _) = opt(tag("(")).parse(input)?;
+    let (input, _) = opt(tag("(")).parse_complete(input)?;
     let (input, _) = multispace0(input)?;
     let (input, start) = var_or_num(input)?;
-    let (input, _) = tag("..").parse(input)?;
+    let (input, _) = tag("..").parse_complete(input)?;
     let (input, end) = var_or_num(input)?;
     let (input, _) = multispace0(input)?;
-    let (input, _) = opt(tag(")")).parse(input)?;
+    let (input, _) = opt(tag(")")).parse_complete(input)?;
     Ok((input, Range::new(start, end)))
 }
 
@@ -75,9 +75,9 @@ fn for_inner(input: Span) -> IResult<Span, (Span, Iter)> {
     }
     let (input, name) = var_name(input)?;
     let (input, _) = multispace0(input)?;
-    let (input, _) = tag("in").parse(input)?;
+    let (input, _) = tag("in").parse_complete(input)?;
     let (input, _) = multispace0(input)?;
-    let (input, i) = alt((into(list), into(range), into(var_name))).parse(input)?;
+    let (input, i) = alt((into(list), into(range), into(var_name))).parse_complete(input)?;
     Ok((input, (name, i)))
 }
 
@@ -93,7 +93,7 @@ pub fn while_loop(input: Span) -> IResult<Span, Loop> {
             open_brace,
         ),
     )
-    .parse(input)?;
+    .parse_complete(input)?;
     let (input, (body, close)) = loop_body(input)?;
     let l = Loop::new_with_body(Loops::While(loop_tag, op), body, open, close);
     Ok((input, l))
@@ -111,7 +111,7 @@ pub fn if_stmt(input: Span) -> IResult<Span, Loop> {
             open_brace,
         ),
     )
-    .parse(input)?;
+    .parse_complete(input)?;
     let (input, (body, close)) = loop_body(input)?;
     let l = Loop::new_with_body(Loops::If(loop_tag, op), body, open, close);
     Ok((input, l))
@@ -126,16 +126,16 @@ pub fn loops(input: Span) -> IResult<Span, Loop> {
         alt((if_stmt, while_loop, for_loop)),
         multispace0,
     )
-    .parse(input)
+    .parse_complete(input)
 }
 
 pub fn loop_body(input: Span<'_>) -> IResult<Span<'_>, (VecDeque<Line<'_>>, Span<'_>)> {
     if *DEBUG_PRINT {
         eprintln!("Parsing input for the lines for the loop body:{}", input);
     }
-    let (input, loop_input) = take_till1(|c| c == '}').parse(input)?;
+    let (input, loop_input) = take_till1(|c| c == '}').parse_complete(input)?;
     let (input, brace) = close_brace(input)?;
-    let (_, i) = lines(loop_input)?;
+    let (_, i) = into(many1(line)).parse_complete(loop_input)?;
     Ok((input, (i, brace)))
 }
 
@@ -155,9 +155,8 @@ mod test {
                     Iter::Var(Span::new_from_raw_offset(18, 2, "somethingElse", ())),
                 ),
                 Span::new_from_raw_offset(33, 2, "{", ()),
-                Span::new_from_raw_offset(55, 4, "}", ()),
+                Span::new_from_raw_offset(54, 4, "}", ()),
             );
-            l.add_line(Line::Empty);
             l.add_line(Line::Expr(BitExpr::new(
                 VarNum::Var(Span::new_from_raw_offset(39, 3, "i", ())),
                 BitOps::RightShift,
@@ -169,18 +168,14 @@ mod test {
                     (),
                 ))),
             )));
-            l.add_line(Line::Empty);
-            l.add_line(Line::Empty);
-            assert_eq!(
-                for_loop(Span::new(
-                    r#"
+            let test = (for_loop).parse_complete(Span::new(
+                r#"
 for(something in somethingElse) {
-    i >> something;
+    i >> something
 }
-"#
-                )),
-                Ok((Span::new_from_raw_offset(57, 5, "", ()), l))
-            )
+"#,
+            ));
+            assert_eq!(test, Ok((Span::new_from_raw_offset(55, 4, "\n", ()), l)))
         }
     }
 
@@ -202,9 +197,8 @@ for(something in somethingElse) {
                     ),
                 ),
                 Span::new_from_raw_offset(23, 2, "{", ()),
-                Span::new_from_raw_offset(47, 4, "}", ()),
+                Span::new_from_raw_offset(46, 4, "}", ()),
             );
-            l.add_line(Line::Empty);
             l.add_line(Line::Expr(BitExpr::new(
                 VarNum::Var(Span::new_from_raw_offset(29, 3, "something", ())),
                 BitOps::Xor,
@@ -215,18 +209,14 @@ for(something in somethingElse) {
                     Some(Span::new_from_raw_offset(41, 3, "0x", ())),
                 ))),
             )));
-            l.add_line(Line::Empty);
-            l.add_line(Line::Empty);
-            assert_eq!(
-                while_loop(Span::new(
-                    r#"
+            let test = (while_loop).parse_complete(Span::new(
+                r#"
 while(something == 0) {
-    something ^ 0x76;
+    something ^ 0x76
 }
-"#
-                )),
-                Ok((Span::new_from_raw_offset(49, 5, "", ()), l))
-            )
+"#,
+            ));
+            assert_eq!(test, Ok((Span::new_from_raw_offset(47, 4, "\n", ()), l)))
         }
     }
 
@@ -248,9 +238,8 @@ while(something == 0) {
                     ),
                 ),
                 Span::new_from_raw_offset(20, 2, "{", ()),
-                Span::new_from_raw_offset(34, 4, "}", ()),
+                Span::new_from_raw_offset(33, 4, "}", ()),
             );
-            l.add_line(Line::Empty);
             l.add_line(Line::Expr(BitExpr::new(
                 VarNum::Var(Span::new_from_raw_offset(26, 3, "i", ())),
                 BitOps::LeftShift,
@@ -261,18 +250,14 @@ while(something == 0) {
                     None,
                 ))),
             )));
-            l.add_line(Line::Empty);
-            l.add_line(Line::Empty);
-            assert_eq!(
-                if_stmt(Span::new(
-                    r#"
+            let test = (if_stmt).parse_complete(Span::new(
+                r#"
 if(something == 0) {
-    i << 4;
+    i << 4
 }
-"#
-                )),
-                Ok((Span::new_from_raw_offset(36, 5, "", ()), l))
-            )
+"#,
+            ));
+            assert_eq!(test, Ok((Span::new_from_raw_offset(34, 4, "\n", ()), l)))
         }
     }
 }

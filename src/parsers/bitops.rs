@@ -13,32 +13,32 @@ use nom::{
 };
 
 pub fn bit_or(input: Span) -> IResult<Span, (BitOps, Span)> {
-    let (input, op) = tag("|").parse(input)?;
+    let (input, op) = tag("|").parse_complete(input)?;
     Ok((input, (BitOps::Or, op)))
 }
 
 pub fn bit_xor(input: Span) -> IResult<Span, (BitOps, Span)> {
-    let (input, op) = tag("^").parse(input)?;
+    let (input, op) = tag("^").parse_complete(input)?;
     Ok((input, (BitOps::Xor, op)))
 }
 
 pub fn bit_and(input: Span) -> IResult<Span, (BitOps, Span)> {
-    let (input, op) = tag("&").parse(input)?;
+    let (input, op) = tag("&").parse_complete(input)?;
     Ok((input, (BitOps::And, op)))
 }
 
 pub fn bit_not(input: Span) -> IResult<Span, (BitOps, Span)> {
-    let (input, op) = alt((tag("!"), tag("~"))).parse(input)?;
+    let (input, op) = alt((tag("!"), tag("~"))).parse_complete(input)?;
     Ok((input, (BitOps::Not, op)))
 }
 
 pub fn bit_left(input: Span) -> IResult<Span, (BitOps, Span)> {
-    let (input, op) = tag("<<").parse(input)?;
+    let (input, op) = tag("<<").parse_complete(input)?;
     Ok((input, (BitOps::LeftShift, op)))
 }
 
 pub fn bit_right(input: Span) -> IResult<Span, (BitOps, Span)> {
-    let (input, op) = tag(">>").parse(input)?;
+    let (input, op) = tag(">>").parse_complete(input)?;
     Ok((input, (BitOps::RightShift, op)))
 }
 
@@ -46,15 +46,15 @@ pub fn dual_bit_ops(input: Span) -> IResult<Span, (BitOps, Span)> {
     if *DEBUG_PRINT {
         eprintln!("Parsing input for a dual bit operation:{}", input);
     }
-    alt((bit_or, bit_xor, bit_and, bit_left, bit_right)).parse(input)
+    alt((bit_or, bit_xor, bit_and, bit_left, bit_right)).parse_complete(input)
 }
 
 pub fn dual_expr(input: Span) -> IResult<Span, BitExpr> {
     if *DEBUG_PRINT {
         eprintln!("Parsing input for a dual expression:{}", input);
     }
-    let (input, left) = terminated(var_or_num, multispace0).parse(input)?;
-    let (input, (op, op_span)) = terminated(dual_bit_ops, multispace0).parse(input)?;
+    let (input, left) = terminated(var_or_num, multispace0).parse_complete(input)?;
+    let (input, (op, op_span)) = terminated(dual_bit_ops, multispace0).parse_complete(input)?;
     let (input, right) = var_or_num(input)?;
     Ok((input, BitExpr::new(left, op, op_span, Some(right))))
 }
@@ -63,7 +63,7 @@ pub fn single_expr(input: Span) -> IResult<Span, BitExpr> {
     if *DEBUG_PRINT {
         eprintln!("Parsing input for a single expression:{}", input);
     }
-    let (input, (op, op_span)) = terminated(bit_not, multispace0).parse(input)?;
+    let (input, (op, op_span)) = terminated(bit_not, multispace0).parse_complete(input)?;
     let (input, left) = var_or_num(input)?;
     Ok((input, BitExpr::new(left, op, op_span, None)))
 }
@@ -73,16 +73,16 @@ pub fn expr(input: Span) -> IResult<Span, BitExpr> {
         eprintln!("Parsing input for a raw expression:{}", input);
     }
     let (input, _) = multispace0(input)?;
-    alt((dual_expr, single_expr)).parse(input)
+    alt((dual_expr, single_expr)).parse_complete(input)
 }
 
 pub fn sep_expr(input: Span) -> IResult<Span, SepBitExpr> {
     if *DEBUG_PRINT {
         eprintln!("Parsing input for a separated expression:{}", input);
     }
-    let (input, open) = terminated(tag("("), multispace0).parse(input)?;
+    let (input, open) = terminated(tag("("), multispace0).parse_complete(input)?;
     let (input, e) = expr(input)?;
-    let (input, close) = preceded(multispace0, tag(")")).parse(input)?;
+    let (input, close) = preceded(multispace0, tag(")")).parse_complete(input)?;
     Ok((input, SepBitExpr::new(open, e, close)))
 }
 

@@ -1,24 +1,28 @@
-use super::{DEBUG_PRINT, Span, ast::Funcs, compare::compare, general::var_or_num};
+use super::{
+    DEBUG_PRINT, Span,
+    ast::{BoolFunc, Funcs},
+    compare::compare,
+    general::var_or_num,
+    utils::{close_paren, open_paren},
+};
 use nom::{
     IResult, Parser,
     branch::alt,
     bytes::complete::tag,
     character::complete::multispace0,
     combinator::into,
-    sequence::{delimited, pair, terminated},
+    sequence::{pair, terminated},
 };
 
 pub fn bool_func(input: Span) -> IResult<Span, Funcs> {
     if *DEBUG_PRINT {
         eprintln!("Parsing input for a bool function:{}", input);
     }
-    let (input, func) = tag("bool").parse(input)?;
-    let (input, body) = delimited(
-        pair(tag("("), multispace0),
-        alt((into(compare), into(var_or_num))),
-        pair(multispace0, tag(")")),
+    let (input, (func, body)): (Span, (Span, BoolFunc)) = (
+        terminated(tag("bool"), open_paren),
+        terminated(alt((into(compare), into(var_or_num))), close_paren),
     )
-    .parse(input)?;
+        .parse_complete(input)?;
     Ok((input, Funcs::Bool(func, body)))
 }
 
@@ -28,22 +32,10 @@ pub fn quit_func(input: Span) -> IResult<Span, Funcs> {
     }
     let (input, func) = terminated(
         alt((tag("quit"), tag("exit"))),
-        pair(pair(tag("("), multispace0), pair(multispace0, tag(")"))),
+        pair(open_paren, close_paren),
     )
-    .parse(input)?;
+    .parse_complete(input)?;
     Ok((input, Funcs::Quit(func)))
-}
-
-pub fn run_func(input: Span) -> IResult<Span, Funcs> {
-    if *DEBUG_PRINT {
-        eprintln!("Parsing input for a run function:{}", input);
-    }
-    let (input, func) = terminated(
-        alt((tag("run"), tag("eval"), tag("exec"))),
-        pair(pair(tag("("), multispace0), pair(multispace0, tag(")"))),
-    )
-    .parse(input)?;
-    Ok((input, Funcs::Run(func)))
 }
 
 pub fn funcs(input: Span) -> IResult<Span, Funcs> {
@@ -51,7 +43,7 @@ pub fn funcs(input: Span) -> IResult<Span, Funcs> {
         eprintln!("Parsing input for a function:{}", input);
     }
     let (input, _) = multispace0(input)?;
-    alt((bool_func, quit_func, run_func)).parse(input)
+    alt((bool_func, quit_func)).parse_complete(input)
 }
 
 #[cfg(test)]
@@ -62,66 +54,6 @@ mod test {
     };
 
     use super::*;
-
-    #[test]
-    fn test_run() {
-        unsafe {
-            assert_eq!(
-                run_func(Span::new("run()")),
-                Ok((
-                    Span::new_from_raw_offset(5, 1, "", ()),
-                    Funcs::Run(Span::new_from_raw_offset(0, 1, "run", ()))
-                ))
-            );
-            assert_eq!(
-                funcs(Span::new("run()")),
-                Ok((
-                    Span::new_from_raw_offset(5, 1, "", ()),
-                    Funcs::Run(Span::new_from_raw_offset(0, 1, "run", ()))
-                ))
-            );
-        }
-    }
-
-    #[test]
-    fn test_eval() {
-        unsafe {
-            assert_eq!(
-                run_func(Span::new("eval()")),
-                Ok((
-                    Span::new_from_raw_offset(6, 1, "", ()),
-                    Funcs::Run(Span::new_from_raw_offset(0, 1, "eval", ()))
-                ))
-            );
-            assert_eq!(
-                funcs(Span::new("eval()")),
-                Ok((
-                    Span::new_from_raw_offset(6, 1, "", ()),
-                    Funcs::Run(Span::new_from_raw_offset(0, 1, "eval", ()))
-                ))
-            );
-        }
-    }
-
-    #[test]
-    fn test_exec() {
-        unsafe {
-            assert_eq!(
-                run_func(Span::new("exec()")),
-                Ok((
-                    Span::new_from_raw_offset(6, 1, "", ()),
-                    Funcs::Run(Span::new_from_raw_offset(0, 1, "exec", ()))
-                ))
-            );
-            assert_eq!(
-                funcs(Span::new("exec()")),
-                Ok((
-                    Span::new_from_raw_offset(6, 1, "", ()),
-                    Funcs::Run(Span::new_from_raw_offset(0, 1, "exec", ()))
-                ))
-            );
-        }
-    }
 
     #[test]
     fn test_exit() {
@@ -296,7 +228,7 @@ mod test {
                         Span::new_from_raw_offset(0, 1, "bool", ()),
                         BoolFunc::Compare(CompareOp::new(
                             VarNum::Expr(Box::new(SepBitExpr::new(
-                                Span::new_from_raw_offset(7, 1, "(", ()),
+                                Span::new_from_raw_offset(5, 1, "(", ()),
                                 BitExpr::new(
                                     VarNum::Num(Number::new(
                                         22,
