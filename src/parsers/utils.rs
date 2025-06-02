@@ -1,9 +1,9 @@
-use super::{Span, DEBUG_PRINT};
+use super::{DEBUG_PRINT, Span};
 use nom::{
+    IResult, Parser,
     bytes::complete::tag,
     character::streaming::multispace0,
     sequence::{delimited, preceded, terminated},
-    IResult, Parser,
 };
 
 pub fn space_around<'a, P, O>(

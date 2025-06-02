@@ -1,20 +1,25 @@
 use super::{
     DEBUG_PRINT, Span,
-    ast::{Iter, Line, Loop, Loops, Range, VarNum},
+    ast::{Iter, Line, Loop, Loops, VarNum},
     compare::compare,
+    funcs::range_func,
     general::{line, var_name, var_or_num},
-    utils::{close_brace, close_bracket, close_paren, comma, open_brace, open_bracket, open_paren},
+    utils::{
+        close_brace, close_bracket, close_paren, comma, open_brace, open_bracket, open_paren,
+        opt_multispace0,
+    },
 };
 use nom::{
     IResult, Parser,
     branch::alt,
     bytes::complete::{tag, take_till1},
     character::complete::multispace0,
-    combinator::{into, opt},
-    multi::{many1, separated_list0},
-    sequence::{delimited, preceded},
+    combinator::{eof, into},
+    multi::{many0, separated_list0},
+    sequence::{delimited, preceded, terminated},
 };
 use std::collections::VecDeque;
+use std::sync::Mutex;
 
 pub fn for_loop(input: Span) -> IResult<Span, Loop> {
     if *DEBUG_PRINT {
@@ -23,7 +28,7 @@ pub fn for_loop(input: Span) -> IResult<Span, Loop> {
     let (input, (loop_tag, (inner_name, loop_val), open)) = preceded(
         multispace0,
         (
-            tag("for"),
+            terminated(tag("for"), opt_multispace0),
             delimited(open_paren, for_inner, close_paren),
             open_brace,
         ),
@@ -44,26 +49,12 @@ pub fn list(input: Span) -> IResult<Span, VecDeque<VarNum>> {
         eprintln!("Parsing input for a list:{}", input);
     }
     let (input, list) = delimited(
-        open_bracket,
+        preceded(opt_multispace0, open_bracket),
         separated_list0(comma, var_or_num),
         close_bracket,
     )
     .parse_complete(input)?;
     Ok((input, list.into()))
-}
-
-pub fn range(input: Span) -> IResult<Span, Range> {
-    if *DEBUG_PRINT {
-        eprintln!("Parsing input for a range:{}", input);
-    }
-    let (input, _) = opt(tag("(")).parse_complete(input)?;
-    let (input, _) = multispace0(input)?;
-    let (input, start) = var_or_num(input)?;
-    let (input, _) = tag("..").parse_complete(input)?;
-    let (input, end) = var_or_num(input)?;
-    let (input, _) = multispace0(input)?;
-    let (input, _) = opt(tag(")")).parse_complete(input)?;
-    Ok((input, Range::new(start, end)))
 }
 
 fn for_inner(input: Span) -> IResult<Span, (Span, Iter)> {
@@ -73,11 +64,9 @@ fn for_inner(input: Span) -> IResult<Span, (Span, Iter)> {
             input
         );
     }
-    let (input, name) = var_name(input)?;
-    let (input, _) = multispace0(input)?;
-    let (input, _) = tag("in").parse_complete(input)?;
-    let (input, _) = multispace0(input)?;
-    let (input, i) = alt((into(list), into(range), into(var_name))).parse_complete(input)?;
+    let (input, name) = terminated(var_name, opt_multispace0).parse_complete(input)?;
+    let (input, _) = terminated(tag("in"), opt_multispace0).parse_complete(input)?;
+    let (input, i) = alt((into(list), into(range_func), into(var_name))).parse_complete(input)?;
     Ok((input, (name, i)))
 }
 
@@ -88,7 +77,7 @@ pub fn while_loop(input: Span) -> IResult<Span, Loop> {
     let (input, (loop_tag, op, open)) = preceded(
         multispace0,
         (
-            tag("while"),
+            terminated(tag("while"), opt_multispace0),
             delimited(open_paren, compare, close_paren),
             open_brace,
         ),
@@ -106,7 +95,7 @@ pub fn if_stmt(input: Span) -> IResult<Span, Loop> {
     let (input, (loop_tag, op, open)) = preceded(
         multispace0,
         (
-            tag("if"),
+            terminated(tag("if"), opt_multispace0),
             delimited(open_paren, compare, close_paren),
             open_brace,
         ),
@@ -121,21 +110,39 @@ pub fn loops(input: Span) -> IResult<Span, Loop> {
     if *DEBUG_PRINT {
         eprintln!("Parsing input for a loop:{}", input);
     }
-    delimited(
-        multispace0,
-        alt((if_stmt, while_loop, for_loop)),
-        multispace0,
-    )
-    .parse_complete(input)
+    preceded(multispace0, alt((if_stmt, while_loop, for_loop))).parse_complete(input)
+}
+
+fn brace_count() -> impl Fn(char) -> bool {
+    let brace_count = Mutex::new(0);
+    move |c| {
+        if brace_count.is_poisoned() {
+            brace_count.clear_poison();
+        }
+        let mut bc = brace_count.lock().unwrap();
+        if c == '{' {
+            *bc += 1;
+            false
+        } else if c == '}' {
+            if *bc == 0 {
+                true
+            } else {
+                *bc -= 1;
+                false
+            }
+        } else {
+            false
+        }
+    }
 }
 
 pub fn loop_body(input: Span<'_>) -> IResult<Span<'_>, (VecDeque<Line<'_>>, Span<'_>)> {
     if *DEBUG_PRINT {
         eprintln!("Parsing input for the lines for the loop body:{}", input);
     }
-    let (input, loop_input) = take_till1(|c| c == '}').parse_complete(input)?;
+    let (input, loop_input) = take_till1(brace_count()).parse_complete(input)?;
     let (input, brace) = close_brace(input)?;
-    let (_, i) = into(many1(line)).parse_complete(loop_input)?;
+    let (_, i) = terminated(into(many0(line)), eof).parse_complete(loop_input)?;
     Ok((input, (i, brace)))
 }
 
@@ -151,18 +158,18 @@ mod test {
             let mut l = Loop::new(
                 Loops::For(
                     Span::new_from_raw_offset(1, 2, "for", ()),
-                    Span::new_from_raw_offset(5, 2, "something", ()),
-                    Iter::Var(Span::new_from_raw_offset(18, 2, "somethingElse", ())),
+                    Span::new_from_raw_offset(6, 2, "something", ()),
+                    Iter::Var(Span::new_from_raw_offset(19, 2, "somethingElse", ())),
                 ),
-                Span::new_from_raw_offset(33, 2, "{", ()),
-                Span::new_from_raw_offset(54, 4, "}", ()),
+                Span::new_from_raw_offset(34, 2, "{", ()),
+                Span::new_from_raw_offset(55, 4, "}", ()),
             );
             l.add_line(Line::Expr(BitExpr::new(
-                VarNum::Var(Span::new_from_raw_offset(39, 3, "i", ())),
+                VarNum::Var(Span::new_from_raw_offset(40, 3, "i", ())),
                 BitOps::RightShift,
-                Span::new_from_raw_offset(41, 3, ">>", ()),
+                Span::new_from_raw_offset(42, 3, ">>", ()),
                 Some(VarNum::Var(Span::new_from_raw_offset(
-                    44,
+                    45,
                     3,
                     "something",
                     (),
@@ -170,12 +177,12 @@ mod test {
             )));
             let test = (for_loop).parse_complete(Span::new(
                 r#"
-for(something in somethingElse) {
+for (something in somethingElse) {
     i >> something
 }
 "#,
             ));
-            assert_eq!(test, Ok((Span::new_from_raw_offset(55, 4, "\n", ()), l)))
+            assert_eq!(test, Ok((Span::new_from_raw_offset(56, 4, "\n", ()), l)))
         }
     }
 

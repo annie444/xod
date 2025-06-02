@@ -1,9 +1,9 @@
 use super::{
     DEBUG_PRINT, Span,
-    ast::{BoolFunc, Funcs},
+    ast::{BoolFunc, Funcs, Range},
     compare::compare,
     general::var_or_num,
-    utils::{close_paren, open_paren},
+    utils::{close_paren, comma, open_paren},
 };
 use nom::{
     IResult, Parser,
@@ -11,7 +11,7 @@ use nom::{
     bytes::complete::tag,
     character::complete::multispace0,
     combinator::into,
-    sequence::{pair, terminated},
+    sequence::{pair, separated_pair, terminated},
 };
 
 pub fn bool_tag(input: Span) -> IResult<Span, Span> {
@@ -22,16 +22,16 @@ pub fn bool_tag(input: Span) -> IResult<Span, Span> {
     Ok((input, func))
 }
 
-pub fn bool_func(input: Span) -> IResult<Span, Funcs> {
+pub fn bool_func(input: Span) -> IResult<Span, (Span, BoolFunc)> {
     if *DEBUG_PRINT {
         eprintln!("Parsing input for a bool function:{}", input);
     }
-    let (input, (func, body)): (Span, (Span, BoolFunc)) = (
+    let (input, (func, body)) = (
         terminated(bool_tag, open_paren),
         terminated(alt((into(compare), into(var_or_num))), close_paren),
     )
         .parse_complete(input)?;
-    Ok((input, Funcs::Bool(func, body)))
+    Ok((input, (func, body)))
 }
 
 pub fn quit_tag(input: Span) -> IResult<Span, Span> {
@@ -136,7 +136,27 @@ pub fn funcs(input: Span) -> IResult<Span, Funcs> {
         eprintln!("Parsing input for a function:{}", input);
     }
     let (input, _) = multispace0(input)?;
-    alt((bool_func, quit_func, hex_func, oct_func, bin_func, dec_func)).parse_complete(input)
+    alt((
+        into(bool_func),
+        quit_func,
+        hex_func,
+        oct_func,
+        bin_func,
+        dec_func,
+    ))
+    .parse_complete(input)
+}
+
+pub fn range_func(input: Span) -> IResult<Span, Range> {
+    if *DEBUG_PRINT {
+        eprintln!("Parsing input for a range function:{}", input);
+    }
+    let (input, (func, (start, end))) = (
+        terminated(tag("range"), open_paren),
+        terminated(separated_pair(var_or_num, comma, var_or_num), close_paren),
+    )
+        .parse_complete(input)?;
+    Ok((input, Range::new(func, start, end)))
 }
 
 #[cfg(test)]
@@ -145,8 +165,27 @@ mod test {
     use crate::parsers::ast::{
         BitExpr, BoolFunc, Compare, CompareOp, Funcs, Number, SepBitExpr, VarNum,
     };
+    use crate::parsers::general::lines;
 
     use super::*;
+
+    #[test]
+    fn test_range() {
+        let line = r#"
+for(i in range(0, 6)) {
+    j = 1 << i
+    bin(i)
+    bin(j)
+}
+"#;
+        let span = Span::new(line);
+        let result = lines(span);
+        assert!(
+            result.is_ok(),
+            "Failed to parse range function: {:?}",
+            result.err()
+        );
+    }
 
     #[test]
     fn test_exit() {
@@ -195,7 +234,7 @@ mod test {
                 bool_func(Span::new("bool(0)")),
                 Ok((
                     Span::new_from_raw_offset(7, 1, "", ()),
-                    Funcs::Bool(
+                    (
                         Span::new_from_raw_offset(0, 1, "bool", ()),
                         BoolFunc::VarNum(VarNum::Num(Number::new(
                             0,
@@ -229,7 +268,7 @@ mod test {
                 bool_func(Span::new("bool(someVar)")),
                 Ok((
                     Span::new_from_raw_offset(13, 1, "", ()),
-                    Funcs::Bool(
+                    (
                         Span::new_from_raw_offset(0, 1, "bool", ()),
                         BoolFunc::VarNum(VarNum::Var(Span::new_from_raw_offset(
                             5,
@@ -265,7 +304,7 @@ mod test {
                 bool_func(Span::new("bool(0 < 1)")),
                 Ok((
                     Span::new_from_raw_offset(11, 1, "", ()),
-                    Funcs::Bool(
+                    (
                         Span::new_from_raw_offset(0, 1, "bool", ()),
                         BoolFunc::Compare(CompareOp::new(
                             VarNum::Num(Number::new(
@@ -317,7 +356,7 @@ mod test {
                 bool_func(Span::new("bool((0x16 << 2) > 1)")),
                 Ok((
                     Span::new_from_raw_offset(21, 1, "", ()),
-                    Funcs::Bool(
+                    (
                         Span::new_from_raw_offset(0, 1, "bool", ()),
                         BoolFunc::Compare(CompareOp::new(
                             VarNum::Expr(Box::new(SepBitExpr::new(
@@ -386,5 +425,21 @@ mod test {
                 ))
             )
         }
+    }
+
+    #[test]
+    fn test_bool_function_in_loop() {
+        let line = r#"
+if(bool(other) == 1) {
+    hex(true)
+}
+"#;
+        let span = Span::new(line);
+        let result = lines(span);
+        assert!(
+            result.is_ok(),
+            "Failed to parse bool function in loop: {:?}",
+            result.err()
+        );
     }
 }

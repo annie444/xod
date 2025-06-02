@@ -4,7 +4,6 @@ use crate::parsers::{
     EvalError, ExprError, Expression, Span, exprs::NumOrListNoOp, general::lines,
 };
 use crate::utils::print_num;
-use nom::Parser;
 use rustyline::{
     Behavior, ColorMode, CompletionType, EditMode, Editor,
     config::Config,
@@ -79,7 +78,7 @@ pub fn run() {
             Ok(mut line) => {
                 rl.add_history_entry(line.as_str()).unwrap();
                 // Here you would parse and execute the command
-                line.push_str("\n");
+                line.push('\n');
                 let body = Span::new(&line);
                 let mut parsed_lines = match lines(body) {
                     Ok((_, l)) => l,
@@ -108,26 +107,37 @@ pub fn run() {
                         Err(e) => match e {
                             ExprError::Quit => {
                                 println!("Exiting REPL.");
+                                rl.history_mut()
+                                    .save(&history_file)
+                                    .expect("Failed to save history file");
                                 return;
                             }
                             ExprError::Partial(p) => {
                                 eprintln!("{}", EvalError::from((p, body)))
                             }
-                            ExprError::Print(s) => println!("{}", s),
                         },
                     }
                 }
             }
             Err(ReadlineError::Interrupted) => {
                 println!("Ctrl-C pressed, exiting REPL.");
+                rl.history_mut()
+                    .save(&history_file)
+                    .expect("Failed to save history file");
                 break;
             }
             Err(ReadlineError::Eof) => {
                 println!("Ctrl-D pressed, exiting REPL.");
+                rl.history_mut()
+                    .save(&history_file)
+                    .expect("Failed to save history file");
                 break;
             }
             Err(err) => {
                 println!("Error reading line: {:?}", err);
+                rl.history_mut()
+                    .save(&history_file)
+                    .expect("Failed to save history file");
                 break;
             }
         }

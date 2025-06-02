@@ -39,8 +39,6 @@ pub enum ExprError<'a> {
     Partial(PartialEvalError<'a>),
     #[error("Exiting...")]
     Quit,
-    #[error("Printing...")]
-    Print(String),
 }
 
 impl<'a> From<PartialEvalError<'a>> for ExprError<'a> {

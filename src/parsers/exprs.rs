@@ -1,7 +1,7 @@
 use std::{collections::VecDeque, fmt};
 
 use super::{
-    ExprError, Expression, PartialEvalError, Span, VARIABLES,
+    DEBUG_PRINT, ExprError, Expression, PartialEvalError, Span, VARIABLES,
     ast::{
         BitExpr, BoolFunc, Compare, CompareOp, Funcs, Iter, Line, Loop, Loops, Number, Range,
         SepBitExpr, VarNum, VarOrVal, Variable,
@@ -111,6 +111,13 @@ fn get_var(var: Span) -> Result<NumOrList, ExprError> {
 }
 
 fn set_var(var: Span, value: NumOrList) -> Result<(), ExprError> {
+    if var.fragment().is_empty() {
+        return Err(ExprError::Partial(PartialEvalError {
+            loc: var.to_owned(),
+            msg: "Variable name cannot be empty.".to_owned(),
+            fix: "Please provide a valid variable name.".to_owned(),
+        }));
+    }
     if VARIABLES.is_poisoned() {
         VARIABLES.clear_poison();
     }
@@ -272,6 +279,7 @@ impl<'b, 'a: 'b> Expression<'a, 'b, AnyIterator<'a>> for Iter<'a> {
                         }
                         VarNum::Num(num) => deque.push_back(num.eval()?),
                         VarNum::Expr(expr) => deque.push_back(expr.eval()?),
+                        VarNum::Bool(b) => deque.push_back(b.eval()?),
                     }
                 }
                 Ok(AnyIterator::List(None, deque))
@@ -311,6 +319,13 @@ impl<'b, 'a: 'b> Expression<'a, 'b, AnyIterator<'a>> for Loops<'a> {
             Loops::For(_, var, iter) => {
                 let mut iter = iter.eval()?;
                 iter.set_var(*var);
+                if *DEBUG_PRINT {
+                    eprintln!(
+                        "Evaluating loop for variable: {} over iterator {:?}",
+                        var.fragment(),
+                        iter
+                    );
+                }
                 Ok(iter)
             }
             Loops::While(_, op) => Ok(AnyIterator::Expr(None, false, op.clone())),
@@ -348,6 +363,7 @@ impl<'b, 'a: 'b> Expression<'a, 'b, NumOrList> for VarOrVal<'a> {
                         }
                         VarNum::Num(num) => deque.push_back(num.eval()?),
                         VarNum::Expr(expr) => deque.push_back(expr.eval()?),
+                        VarNum::Bool(b) => deque.push_back(b.eval()?),
                     }
                 }
                 Ok(NumOrList::List(deque))
@@ -355,7 +371,21 @@ impl<'b, 'a: 'b> Expression<'a, 'b, NumOrList> for VarOrVal<'a> {
             VarOrVal::Range(range) => Ok(NumOrList::List(range.eval()?.collect())),
             VarOrVal::Expr(expr) => expr.eval().map(NumOrList::Num),
             VarOrVal::SepExpr(sep_expr) => sep_expr.eval().map(NumOrList::Num),
-            VarOrVal::Func(func) => func.eval(),
+            VarOrVal::Func(func) => match func.eval()?.try_into() {
+                Ok(num_or_list) => Ok(num_or_list),
+                Err(_) => match func {
+                    Funcs::Quit(f)
+                    | Funcs::Bool(f, _)
+                    | Funcs::Dec(f, _)
+                    | Funcs::Hex(f, _)
+                    | Funcs::Oct(f, _)
+                    | Funcs::Bin(f, _) => Err(ExprError::Partial(PartialEvalError {
+                        loc: f.to_owned(),
+                        msg: "Function did not return a number or list.".to_owned(),
+                        fix: "Ensure the function returns a valid number or list.".to_owned(),
+                    })),
+                },
+            },
         }
     }
 }
@@ -366,6 +396,7 @@ impl<'b, 'a: 'b> Expression<'a, 'b, NumOrList> for VarNum<'a> {
             VarNum::Var(var) => get_var(*var),
             VarNum::Num(num) => Ok(NumOrList::Num(num.eval()?)),
             VarNum::Expr(expr) => expr.eval().map(NumOrList::Num),
+            VarNum::Bool(b) => b.eval().map(NumOrList::Num),
         }
     }
 }
@@ -383,15 +414,18 @@ impl<'b, 'a: 'b> Expression<'a, 'b, NumOrListNoOp> for Line<'a> {
     }
 }
 
-impl<'b, 'a: 'b> Expression<'a, 'b, NumOrList> for Funcs<'a> {
-    fn eval(&'b mut self) -> Result<NumOrList, ExprError<'a>> {
+impl<'b, 'a: 'b> Expression<'a, 'b, NumOrListNoOp> for Funcs<'a> {
+    fn eval(&'b mut self) -> Result<NumOrListNoOp, ExprError<'a>> {
         match self {
             Self::Quit(_) => Err(ExprError::Quit),
-            Self::Bool(_, op) => op.eval().map(NumOrList::Num),
+            Self::Bool(_, op) => op.eval().map(NumOrListNoOp::Num),
             Self::Dec(_, var) => {
                 let var = var.eval()?;
                 match var {
-                    NumOrList::Num(num) => Err(ExprError::Print(format!("{}", num))),
+                    NumOrList::Num(num) => {
+                        println!("{}", num);
+                        Ok(NumOrListNoOp::NoOp)
+                    }
                     NumOrList::List(list) => {
                         let len = list.len() - 1;
                         let mut p = "[".to_string();
@@ -403,14 +437,18 @@ impl<'b, 'a: 'b> Expression<'a, 'b, NumOrList> for Funcs<'a> {
                             }
                         }
                         p.push(']');
-                        Err(ExprError::Print(p))
+                        println!("{}", p);
+                        Ok(NumOrListNoOp::NoOp)
                     }
                 }
             }
             Self::Hex(_, var) => {
                 let var = var.eval()?;
                 match var {
-                    NumOrList::Num(num) => Err(ExprError::Print(format!("0x{:x}", num))),
+                    NumOrList::Num(num) => {
+                        println!("0x{:x}", num);
+                        Ok(NumOrListNoOp::NoOp)
+                    }
                     NumOrList::List(list) => {
                         let len = list.len() - 1;
                         let mut p = "[".to_string();
@@ -422,14 +460,18 @@ impl<'b, 'a: 'b> Expression<'a, 'b, NumOrList> for Funcs<'a> {
                             }
                         }
                         p.push(']');
-                        Err(ExprError::Print(p))
+                        println!("{}", p);
+                        Ok(NumOrListNoOp::NoOp)
                     }
                 }
             }
             Self::Oct(_, var) => {
                 let var = var.eval()?;
                 match var {
-                    NumOrList::Num(num) => Err(ExprError::Print(format!("0o{:o}", num))),
+                    NumOrList::Num(num) => {
+                        println!("0o{:o}", num);
+                        Ok(NumOrListNoOp::NoOp)
+                    }
                     NumOrList::List(list) => {
                         let len = list.len() - 1;
                         let mut p = "[".to_string();
@@ -441,14 +483,18 @@ impl<'b, 'a: 'b> Expression<'a, 'b, NumOrList> for Funcs<'a> {
                             }
                         }
                         p.push(']');
-                        Err(ExprError::Print(p))
+                        println!("{}", p);
+                        Ok(NumOrListNoOp::NoOp)
                     }
                 }
             }
             Self::Bin(_, var) => {
                 let var = var.eval()?;
                 match var {
-                    NumOrList::Num(num) => Err(ExprError::Print(format!("0b{:b}", num))),
+                    NumOrList::Num(num) => {
+                        println!("0b{:b}", num);
+                        Ok(NumOrListNoOp::NoOp)
+                    }
                     NumOrList::List(list) => {
                         let len = list.len() - 1;
                         let mut p = "[".to_string();
@@ -460,7 +506,8 @@ impl<'b, 'a: 'b> Expression<'a, 'b, NumOrList> for Funcs<'a> {
                             }
                         }
                         p.push(']');
-                        Err(ExprError::Print(p))
+                        println!("{}", p);
+                        Ok(NumOrListNoOp::NoOp)
                     }
                 }
             }

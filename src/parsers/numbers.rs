@@ -106,7 +106,12 @@ pub fn num(input: Span) -> IResult<Span, Number> {
     if *DEBUG_PRINT {
         eprintln!("Parsing input for a number:{}", input);
     }
-    preceded(opt_multispace0, alt((hex_num, oct_num, bin_num, dec_num))).parse_complete(input)
+    let (input, number) = preceded(opt_multispace0, alt((hex_num, oct_num, bin_num, dec_num)))
+        .parse_complete(input)?;
+    if *DEBUG_PRINT {
+        eprintln!("Parsed input for a number:{}, {}", input, number);
+    }
+    Ok((input, number))
 }
 
 #[cfg(test)]

@@ -1,5 +1,4 @@
 use color_print::cformat;
-use nom::error::ContextError;
 use rustyline::{
     Context, Helper,
     completion::{Candidate, Completer},
@@ -12,12 +11,10 @@ use rustyline::{
 use std::{
     borrow::Cow::{self, Borrowed, Owned},
     cell::Cell,
+    io::Write,
 };
 
-use crate::{
-    parsers::{Span, general::lines},
-    utils::string_to_static_str,
-};
+use crate::parsers::{DEBUG_PRINT, Span, general::lines};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct XodHelper {
@@ -190,6 +187,28 @@ impl Highlighter for XodHelper {
         Borrowed(line)
     }
 
+    fn highlight_prompt<'b, 's: 'b, 'p: 'b>(
+        &'b self,
+        prompt: &'p str,
+        default: bool,
+    ) -> Cow<'b, str> {
+        if prompt.is_empty() {
+            return Borrowed(prompt);
+        }
+        if default {
+            let copy = cformat!("<s><c!>{}</></>", prompt);
+            Owned(copy)
+        } else {
+            let copy = cformat!("<s><m!>{}</></>", prompt);
+            Owned(copy)
+        }
+    }
+
+    fn highlight_hint<'h>(&self, hint: &'h str) -> Cow<'h, str> {
+        let hint = cformat!("<dim>{}</>", hint);
+        Owned(hint)
+    }
+
     fn highlight_char(&self, line: &str, pos: usize, kind: CmdKind) -> bool {
         if kind == CmdKind::ForcedRefresh {
             self.bracket.set(None);
@@ -297,61 +316,86 @@ const fn is_close_bracket(bracket: u8) -> bool {
     matches!(bracket, b'}' | b']' | b')')
 }
 
+const FUNCTIONS: [&'static str; 7] = ["exit", "quit", "hex", "bin", "dec", "oct", "bool"];
+
 impl Validator for XodHelper {
     fn validate(&self, ctx: &mut ValidationContext) -> Result<ValidationResult, ReadlineError> {
+        if ctx.input().is_empty() {
+            return Ok(ValidationResult::Valid(None));
+        }
         let brackets = validate_brackets(ctx.input());
-        if matches!(brackets, ValidationResult::Incomplete) {
-            return Ok(ValidationResult::Incomplete);
+        if matches!(brackets, ValidationResult::Incomplete)
+            || matches!(brackets, ValidationResult::Invalid(_))
+        {
+            return Ok(brackets);
         }
-        let input = format!("{}\n", ctx.input());
-        let input = Span::new(&input);
-        match lines(input) {
-            Ok((_, _)) => Ok(ValidationResult::Valid(None)),
-            Err(e) => match e {
-                nom::Err::Incomplete(_) => Ok(ValidationResult::Incomplete),
-                nom::Err::Error(e) | nom::Err::Failure(e) => {
-                    let mut error = String::new();
-                    error.push_str(&cformat!(
-                        "\n<s><r!>error</>: {}</>\n",
-                        e.code.description()
-                    ));
-                    let start = e.input.naive_get_utf8_column();
-                    let end = e.input.fragment().len();
-                    let line = e.input.location_line();
-                    error.push_str(&cformat!(
-                        "<s><b!> --></> line {line}, cols {start}-{}</>\n",
-                        start + end,
-                    ));
-                    let line = cformat!("<s><b!>|</></>");
-                    let body: String = e
-                        .input
-                        .fragment()
-                        .split('\n')
-                        .enumerate()
-                        .map(|(i, s)| cformat!("\n{line} <b!>{i:0>2}</>\t{s}"))
-                        .collect();
-                    error.push_str(&line);
-                    error.push_str(&body);
-                    error.push('\n');
-                    let space = vec![' '; start - 1].into_iter().collect::<String>();
-                    let underline =
-                        cformat!("<s><c!>{}</></>", vec!['^'; end].iter().collect::<String>());
-                    let arrow1 = cformat!("<s><c!>│</></>");
-                    let arrow2 = format!(
-                        "{}{arrow1}",
-                        vec![' '; end - 2].into_iter().collect::<String>(),
-                    );
-                    let underscore: String = cformat!(
-                        "<s><c!>└{}┘</></>",
-                        vec!['─'; end - 2].iter().collect::<String>()
-                    );
-                    error.push_str(&format!("{line}   \t{space}{underline}\n"));
-                    error.push_str(&format!("    \t{space}{arrow1}{arrow2}\n"));
-                    error.push_str(&format!("    \t{space}{underscore}\n"));
-                    Ok(ValidationResult::Invalid(Some(error)))
+        let func = validate_function(ctx.input());
+        if matches!(func, ValidationResult::Invalid(_)) {
+            return Ok(func);
+        }
+        Ok(validate_parse(ctx.input()))
+    }
+}
+
+fn validate_function(src: &str) -> ValidationResult {
+    for func in FUNCTIONS {
+        if src.contains(func) {
+            let f = src.find(func).unwrap();
+            if !src[f + func.len()..].contains(['(']) && !src[f + func.len()..].contains([')']) {
+                return ValidationResult::Invalid(Some(format!(
+                    "\nFunction `{func}` requires parentheses: `{func}()`",
+                )));
+            }
+        }
+    }
+    ValidationResult::Valid(None)
+}
+
+fn validate_parse(src: &str) -> ValidationResult {
+    let input_str = format!("{}\n", src);
+    let input = Span::new(&input_str);
+    match lines(input) {
+        Ok((_, _)) => ValidationResult::Valid(None),
+        Err(e) => match e {
+            nom::Err::Incomplete(_) => ValidationResult::Incomplete,
+            nom::Err::Error(e) | nom::Err::Failure(e) => {
+                if *DEBUG_PRINT {
+                    let debug_file_path = std::path::Path::new("debug.txt");
+                    let mut debug_file = std::fs::OpenOptions::new()
+                        .append(true)
+                        .create(true)
+                        .open(debug_file_path)
+                        .unwrap();
+                    debug_file
+                        .write_all(format!("Error: {:?}\n", e).as_bytes())
+                        .unwrap();
                 }
-            },
-        }
+                let mut error = String::new();
+                error.push_str(&cformat!(
+                    "\n<s><r!>error</>: {}</>\n",
+                    e.code.description()
+                ));
+                let start = e.input.naive_get_utf8_column();
+                let end = e.input.fragment().len();
+                let line = e.input.location_line();
+                error.push_str(&cformat!(
+                    "<s><b!> --></> line {line}, cols {start}-{}</>\n",
+                    start + end,
+                ));
+                let line = cformat!("<s><b!>|</></>");
+                let body: String = e
+                    .input
+                    .fragment()
+                    .split('\n')
+                    .enumerate()
+                    .map(|(i, s)| cformat!("\n{line} <b!>{i:0>2}</>\t{s}"))
+                    .collect();
+                error.push_str(&line);
+                error.push_str(&body);
+                error.push_str(&format!("\n{line}\n"));
+                ValidationResult::Invalid(Some(error))
+            }
+        },
     }
 }
 
@@ -364,12 +408,12 @@ fn validate_brackets(input: &str) -> ValidationResult {
                 (Some('('), ')') | (Some('['), ']') | (Some('{'), '}') => {}
                 (Some(wanted), _) => {
                     return ValidationResult::Invalid(Some(format!(
-                        "Mismatched brackets: {wanted:?} is not properly closed"
+                        "\nMismatched brackets: {wanted:?} is not properly closed"
                     )));
                 }
                 (None, c) => {
                     return ValidationResult::Invalid(Some(format!(
-                        "Mismatched brackets: {c:?} is unpaired"
+                        "\nMismatched brackets: {c:?} is unpaired"
                     )));
                 }
             },

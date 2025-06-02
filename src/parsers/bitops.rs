@@ -2,14 +2,12 @@ use super::{
     DEBUG_PRINT, Span,
     ast::{BitExpr, SepBitExpr},
     general::var_or_num,
+    utils::{close_paren, open_paren, opt_multispace0},
 };
 use crate::bitops::BitOps;
 use nom::{
-    IResult, Parser,
-    branch::alt,
-    bytes::complete::tag,
-    character::complete::multispace0,
-    sequence::{preceded, terminated},
+    IResult, Parser, branch::alt, bytes::complete::tag, character::complete::multispace0,
+    sequence::terminated,
 };
 
 pub fn bit_or(input: Span) -> IResult<Span, (BitOps, Span)> {
@@ -53,8 +51,8 @@ pub fn dual_expr(input: Span) -> IResult<Span, BitExpr> {
     if *DEBUG_PRINT {
         eprintln!("Parsing input for a dual expression:{}", input);
     }
-    let (input, left) = terminated(var_or_num, multispace0).parse_complete(input)?;
-    let (input, (op, op_span)) = terminated(dual_bit_ops, multispace0).parse_complete(input)?;
+    let (input, left) = terminated(var_or_num, opt_multispace0).parse_complete(input)?;
+    let (input, (op, op_span)) = terminated(dual_bit_ops, opt_multispace0).parse_complete(input)?;
     let (input, right) = var_or_num(input)?;
     Ok((input, BitExpr::new(left, op, op_span, Some(right))))
 }
@@ -63,7 +61,7 @@ pub fn single_expr(input: Span) -> IResult<Span, BitExpr> {
     if *DEBUG_PRINT {
         eprintln!("Parsing input for a single expression:{}", input);
     }
-    let (input, (op, op_span)) = terminated(bit_not, multispace0).parse_complete(input)?;
+    let (input, (op, op_span)) = terminated(bit_not, opt_multispace0).parse_complete(input)?;
     let (input, left) = var_or_num(input)?;
     Ok((input, BitExpr::new(left, op, op_span, None)))
 }
@@ -80,10 +78,10 @@ pub fn sep_expr(input: Span) -> IResult<Span, SepBitExpr> {
     if *DEBUG_PRINT {
         eprintln!("Parsing input for a separated expression:{}", input);
     }
-    let (input, open) = terminated(tag("("), multispace0).parse_complete(input)?;
-    let (input, e) = expr(input)?;
-    let (input, close) = preceded(multispace0, tag(")")).parse_complete(input)?;
-    Ok((input, SepBitExpr::new(open, e, close)))
+    let (input, open) = open_paren(input)?;
+    let (input, expr) = expr(input)?;
+    let (input, close) = close_paren(input)?;
+    Ok((input, SepBitExpr::new(open, expr, close)))
 }
 
 #[cfg(test)]

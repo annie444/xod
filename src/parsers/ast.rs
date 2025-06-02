@@ -47,6 +47,7 @@ impl<'a> From<(usize, Span<'a>)> for Number<'a> {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Range<'a> {
+    pub fragment: Span<'a>,
     pub start: VarNum<'a>,
     pub end: VarNum<'a>,
 }
@@ -58,8 +59,12 @@ impl std::fmt::Display for Range<'_> {
 }
 
 impl<'a> Range<'a> {
-    pub fn new(start: VarNum<'a>, end: VarNum<'a>) -> Self {
-        Self { start, end }
+    pub fn new(fragment: Span<'a>, start: VarNum<'a>, end: VarNum<'a>) -> Self {
+        Self {
+            fragment,
+            start,
+            end,
+        }
     }
 }
 
@@ -291,6 +296,7 @@ pub enum VarNum<'a> {
     Var(Span<'a>),
     Num(Number<'a>),
     Expr(Box<SepBitExpr<'a>>),
+    Bool(Box<BoolFunc<'a>>),
 }
 
 impl<'a> VarNum<'a> {
@@ -314,6 +320,10 @@ impl<'a> VarNum<'a> {
             Self::Var(v) => *v,
             Self::Num(n) => n.1,
             Self::Expr(e) => e.open,
+            Self::Bool(b) => match &**b {
+                BoolFunc::Compare(c) => c.left.fragment(),
+                BoolFunc::VarNum(v) => v.fragment(),
+            },
         }
     }
 }
@@ -326,7 +336,14 @@ impl fmt::Display for VarNum<'_> {
             Self::Expr(x) => {
                 write!(f, "{}", x)
             }
+            Self::Bool(b) => write!(f, "{}", b),
         }
+    }
+}
+
+impl<'a> From<(Span<'a>, BoolFunc<'a>)> for VarNum<'a> {
+    fn from(value: (Span<'a>, BoolFunc<'a>)) -> Self {
+        Self::Bool(Box::new(value.1))
     }
 }
 
@@ -439,6 +456,12 @@ impl fmt::Display for Funcs<'_> {
             Self::Oct(_, v) => write!(f, "oct({})", v),
             Self::Dec(_, v) => write!(f, "dec({})", v),
         }
+    }
+}
+
+impl<'a> From<(Span<'a>, BoolFunc<'a>)> for Funcs<'a> {
+    fn from(value: (Span<'a>, BoolFunc<'a>)) -> Self {
+        Self::Bool(value.0, value.1)
     }
 }
 
