@@ -17,10 +17,21 @@ use std::{fmt, option_env, sync::LazyLock};
 
 pub static VARIABLES: Mutex<BTreeMap<String, NumOrList>> = Mutex::new(BTreeMap::new());
 
-pub static DEBUG_PRINT: LazyLock<bool> =
-    LazyLock::new(|| option_env!("PARSE_DEBUG").map(|_| true).unwrap_or(false));
+pub static DEBUG_PRINT: LazyLock<bool> = LazyLock::new(|| {
+    option_env!("PARSE_DEBUG")
+        .map(|val| {
+            let v = val.trim();
+            v == "1" || v.eq_ignore_ascii_case("true")
+        })
+        .unwrap_or(false)
+});
 
 pub type Span<'a> = LocatedSpan<&'a str>;
+
+pub enum XodErr<I> {
+    Parse(I, nom::error::ErrorKind),
+    Incomplete(I, nom::Needed),
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum ExprError<'a> {
@@ -28,6 +39,8 @@ pub enum ExprError<'a> {
     Partial(PartialEvalError<'a>),
     #[error("Exiting...")]
     Quit,
+    #[error("Printing...")]
+    Print(String),
 }
 
 impl<'a> From<PartialEvalError<'a>> for ExprError<'a> {

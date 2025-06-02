@@ -423,6 +423,10 @@ impl<'a> From<Loop<'a>> for Line<'a> {
 pub enum Funcs<'a> {
     Bool(Span<'a>, BoolFunc<'a>),
     Quit(Span<'a>),
+    Hex(Span<'a>, VarNum<'a>),
+    Bin(Span<'a>, VarNum<'a>),
+    Oct(Span<'a>, VarNum<'a>),
+    Dec(Span<'a>, VarNum<'a>),
 }
 
 impl fmt::Display for Funcs<'_> {
@@ -430,6 +434,10 @@ impl fmt::Display for Funcs<'_> {
         match self {
             Self::Bool(_, i) => write!(f, "bool({})", i),
             Self::Quit(_) => write!(f, "quit()"),
+            Self::Hex(_, v) => write!(f, "hex({})", v),
+            Self::Bin(_, v) => write!(f, "bin({})", v),
+            Self::Oct(_, v) => write!(f, "oct({})", v),
+            Self::Dec(_, v) => write!(f, "dec({})", v),
         }
     }
 }

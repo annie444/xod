@@ -14,28 +14,121 @@ use nom::{
     sequence::{pair, terminated},
 };
 
+pub fn bool_tag(input: Span) -> IResult<Span, Span> {
+    if *DEBUG_PRINT {
+        eprintln!("Parsing input for a bool tag:{}", input);
+    }
+    let (input, func) = tag("bool").parse_complete(input)?;
+    Ok((input, func))
+}
+
 pub fn bool_func(input: Span) -> IResult<Span, Funcs> {
     if *DEBUG_PRINT {
         eprintln!("Parsing input for a bool function:{}", input);
     }
     let (input, (func, body)): (Span, (Span, BoolFunc)) = (
-        terminated(tag("bool"), open_paren),
+        terminated(bool_tag, open_paren),
         terminated(alt((into(compare), into(var_or_num))), close_paren),
     )
         .parse_complete(input)?;
     Ok((input, Funcs::Bool(func, body)))
 }
 
+pub fn quit_tag(input: Span) -> IResult<Span, Span> {
+    if *DEBUG_PRINT {
+        eprintln!("Parsing input for a bool tag:{}", input);
+    }
+    let (input, func) = alt((tag("quit"), tag("exit"))).parse_complete(input)?;
+    Ok((input, func))
+}
+
 pub fn quit_func(input: Span) -> IResult<Span, Funcs> {
     if *DEBUG_PRINT {
         eprintln!("Parsing input for a quit function:{}", input);
     }
-    let (input, func) = terminated(
-        alt((tag("quit"), tag("exit"))),
-        pair(open_paren, close_paren),
-    )
-    .parse_complete(input)?;
+    let (input, func) =
+        terminated(quit_tag, pair(open_paren, close_paren)).parse_complete(input)?;
     Ok((input, Funcs::Quit(func)))
+}
+
+pub fn hex_tag(input: Span) -> IResult<Span, Span> {
+    if *DEBUG_PRINT {
+        eprintln!("Parsing input for a hex tag:{}", input);
+    }
+    let (input, func) = tag("hex").parse_complete(input)?;
+    Ok((input, func))
+}
+
+pub fn hex_func(input: Span) -> IResult<Span, Funcs> {
+    if *DEBUG_PRINT {
+        eprintln!("Parsing input for a hex function:{}", input);
+    }
+    let (input, (func, body)) = (
+        terminated(hex_tag, open_paren),
+        terminated(var_or_num, close_paren),
+    )
+        .parse_complete(input)?;
+    Ok((input, Funcs::Hex(func, body)))
+}
+
+pub fn bin_tag(input: Span) -> IResult<Span, Span> {
+    if *DEBUG_PRINT {
+        eprintln!("Parsing input for a hex tag:{}", input);
+    }
+    let (input, func) = tag("bin").parse_complete(input)?;
+    Ok((input, func))
+}
+
+pub fn bin_func(input: Span) -> IResult<Span, Funcs> {
+    if *DEBUG_PRINT {
+        eprintln!("Parsing input for a hex function:{}", input);
+    }
+    let (input, (func, body)) = (
+        terminated(bin_tag, open_paren),
+        terminated(var_or_num, close_paren),
+    )
+        .parse_complete(input)?;
+    Ok((input, Funcs::Bin(func, body)))
+}
+
+pub fn oct_tag(input: Span) -> IResult<Span, Span> {
+    if *DEBUG_PRINT {
+        eprintln!("Parsing input for a hex tag:{}", input);
+    }
+    let (input, func) = tag("oct").parse_complete(input)?;
+    Ok((input, func))
+}
+
+pub fn oct_func(input: Span) -> IResult<Span, Funcs> {
+    if *DEBUG_PRINT {
+        eprintln!("Parsing input for a hex function:{}", input);
+    }
+    let (input, (func, body)) = (
+        terminated(oct_tag, open_paren),
+        terminated(var_or_num, close_paren),
+    )
+        .parse_complete(input)?;
+    Ok((input, Funcs::Oct(func, body)))
+}
+
+pub fn dec_tag(input: Span) -> IResult<Span, Span> {
+    if *DEBUG_PRINT {
+        eprintln!("Parsing input for a hex tag:{}", input);
+    }
+    let (input, func) = tag("dec").parse_complete(input)?;
+    Ok((input, func))
+}
+
+pub fn dec_func(input: Span) -> IResult<Span, Funcs> {
+    if *DEBUG_PRINT {
+        eprintln!("Parsing input for a hex function:{}", input);
+    }
+    let (input, (func, body)) = (
+        terminated(dec_tag, open_paren),
+        terminated(var_or_num, close_paren),
+    )
+        .parse_complete(input)?;
+    Ok((input, Funcs::Dec(func, body)))
 }
 
 pub fn funcs(input: Span) -> IResult<Span, Funcs> {
@@ -43,7 +136,7 @@ pub fn funcs(input: Span) -> IResult<Span, Funcs> {
         eprintln!("Parsing input for a function:{}", input);
     }
     let (input, _) = multispace0(input)?;
-    alt((bool_func, quit_func)).parse_complete(input)
+    alt((bool_func, quit_func, hex_func, oct_func, bin_func, dec_func)).parse_complete(input)
 }
 
 #[cfg(test)]

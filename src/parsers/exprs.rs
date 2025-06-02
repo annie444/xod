@@ -388,6 +388,82 @@ impl<'b, 'a: 'b> Expression<'a, 'b, NumOrList> for Funcs<'a> {
         match self {
             Self::Quit(_) => Err(ExprError::Quit),
             Self::Bool(_, op) => op.eval().map(NumOrList::Num),
+            Self::Dec(_, var) => {
+                let var = var.eval()?;
+                match var {
+                    NumOrList::Num(num) => Err(ExprError::Print(format!("{}", num))),
+                    NumOrList::List(list) => {
+                        let len = list.len() - 1;
+                        let mut p = "[".to_string();
+                        for (i, num) in list.iter().enumerate() {
+                            if i < len {
+                                p.push_str(&format!("{}, ", num));
+                            } else {
+                                p.push_str(&format!("{}", num));
+                            }
+                        }
+                        p.push(']');
+                        Err(ExprError::Print(p))
+                    }
+                }
+            }
+            Self::Hex(_, var) => {
+                let var = var.eval()?;
+                match var {
+                    NumOrList::Num(num) => Err(ExprError::Print(format!("0x{:x}", num))),
+                    NumOrList::List(list) => {
+                        let len = list.len() - 1;
+                        let mut p = "[".to_string();
+                        for (i, num) in list.iter().enumerate() {
+                            if i < len {
+                                p.push_str(&format!("0x{:x}, ", num));
+                            } else {
+                                p.push_str(&format!("0x{:x}", num));
+                            }
+                        }
+                        p.push(']');
+                        Err(ExprError::Print(p))
+                    }
+                }
+            }
+            Self::Oct(_, var) => {
+                let var = var.eval()?;
+                match var {
+                    NumOrList::Num(num) => Err(ExprError::Print(format!("0o{:o}", num))),
+                    NumOrList::List(list) => {
+                        let len = list.len() - 1;
+                        let mut p = "[".to_string();
+                        for (i, num) in list.iter().enumerate() {
+                            if i < len {
+                                p.push_str(&format!("0o{:o}, ", num));
+                            } else {
+                                p.push_str(&format!("0o{:o}", num));
+                            }
+                        }
+                        p.push(']');
+                        Err(ExprError::Print(p))
+                    }
+                }
+            }
+            Self::Bin(_, var) => {
+                let var = var.eval()?;
+                match var {
+                    NumOrList::Num(num) => Err(ExprError::Print(format!("0b{:b}", num))),
+                    NumOrList::List(list) => {
+                        let len = list.len() - 1;
+                        let mut p = "[".to_string();
+                        for (i, num) in list.iter().enumerate() {
+                            if i < len {
+                                p.push_str(&format!("0b{:b}, ", num));
+                            } else {
+                                p.push_str(&format!("0b{:b}", num));
+                            }
+                        }
+                        p.push(']');
+                        Err(ExprError::Print(p))
+                    }
+                }
+            }
         }
     }
 }
@@ -451,5 +527,33 @@ impl<'b, 'a: 'b> Expression<'a, 'b, usize> for BitExpr<'a> {
 impl<'b, 'a: 'b> Expression<'a, 'b, usize> for SepBitExpr<'a> {
     fn eval(&'b mut self) -> Result<usize, ExprError<'a>> {
         self.expr.eval()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::parsers::general::lines;
+
+    use super::*;
+
+    #[test]
+    fn evaluate_simple_variable_expression() {
+        let lns = lines(Span::new(
+            r#"
+x = 42
+"#,
+        ));
+        assert!(lns.is_ok());
+        let mut lns = lns.unwrap();
+        for line in &mut lns.1 {
+            let val = line.eval();
+            assert!(val.is_ok());
+            let val = val.unwrap();
+            assert_eq!(val, NumOrListNoOp::NoOp);
+        }
+        let vars = VARIABLES.lock().unwrap();
+        assert!(vars.contains_key("x"));
+        let x = vars.get("x").unwrap();
+        assert_eq!(x, &NumOrList::Num(42));
     }
 }

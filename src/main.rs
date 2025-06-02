@@ -1,5 +1,5 @@
 use clap::{CommandFactory, Parser, error::ErrorKind};
-use xod::{bitops::BitOps, cli_parser::NumberParser, utils::print_num};
+use xod::{bitops::BitOps, cli_parser::NumberParser, repl::run, utils::print_num};
 
 /// Lightweight binary number calculator.
 ///
@@ -11,7 +11,7 @@ pub struct HexOctBin {
     /// The main numerical value in either hexadecimal (0x), binary (0b), octal (0o), or decimal
     /// (default) form.
     #[clap(value_parser = NumberParser::new())]
-    pub number: usize,
+    pub number: Option<usize>,
 
     /// A bitwise operator: AND (&), OR (|), NOT (! or ~), XOR (^), LEFT SHIFT (<<), RIGHT SHIFT (>>)
     pub operation: Option<BitOps>,
@@ -23,26 +23,38 @@ pub struct HexOctBin {
 
 fn main() {
     let args = HexOctBin::parse();
-    print_num("Input Number:", args.number);
+    match args.number {
+        Some(_) => {
+            print_nums(args);
+        }
+        None => {
+            run();
+        }
+    }
+}
+
+fn print_nums(args: HexOctBin) {
+    let number = args.number.unwrap();
+    print_num("Input Number:", number);
 
     if args.operation.is_some() && args.other.is_some() {
         let op = args.operation.unwrap();
         let other = args.other.unwrap();
 
         let result = match op {
-            BitOps::Xor => args.number ^ other,
-            BitOps::LeftShift => args.number << other,
-            BitOps::Not => !args.number,
-            BitOps::Or => args.number | other,
-            BitOps::RightShift => args.number >> other,
-            BitOps::And => args.number & other,
+            BitOps::Xor => number ^ other,
+            BitOps::LeftShift => number << other,
+            BitOps::Not => !number,
+            BitOps::Or => number | other,
+            BitOps::RightShift => number >> other,
+            BitOps::And => number & other,
         };
         print_num("Other Number:", other);
         print_num("Resulting Value:", result);
     } else if args.operation.is_some() {
         let op = args.operation.unwrap();
         let result = match op {
-            BitOps::Not => !args.number,
+            BitOps::Not => !number,
             _ => HexOctBin::command()
                 .error(
                     ErrorKind::InvalidValue,
@@ -52,7 +64,7 @@ fn main() {
 Example:
     {} {} 0xff
                 "#,
-                        op, args.number, op
+                        op, number, op
                     ),
                 )
                 .exit(),
