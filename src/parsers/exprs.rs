@@ -457,11 +457,6 @@ impl<'b, 'a: 'b> Expression<'a, 'b, AnyIterator<'a>> for Loops<'a> {
             Loops::For(_, var, iter) => {
                 let mut iter = iter.eval()?;
                 iter.set_var(*var);
-                dbg!(
-                    "Evaluating loop for variable: {} over iterator {:?}",
-                    var.fragment(),
-                    &iter
-                );
                 Ok(iter)
             }
             Loops::While(_, op) => Ok(AnyIterator::Expr(None, false, op.clone())),
