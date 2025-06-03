@@ -41,13 +41,22 @@ pub struct XodTabEventHandler;
 impl ConditionalEventHandler for XodTabEventHandler {
     fn handle(&self, evt: &Event, n: RepeatCount, _: bool, ctx: &EventContext) -> Option<Cmd> {
         debug_assert_eq!(*evt, Event::from(KeyEvent::from('\t')));
+        eprintln!("{}", n);
         if ctx.line()[..ctx.pos()]
             .chars()
             .next_back()
             .filter(|c| c.is_whitespace())
             .is_some()
         {
-            Some(Cmd::Insert(n, "    ".to_string()))
+            if n == 1 {
+                Some(Cmd::Insert(1, "   ".to_string()))
+            } else {
+                let mut string = "   ".to_string();
+                for _ in 1..n {
+                    string.push_str("    ");
+                }
+                Some(Cmd::Insert(1, string))
+            }
         } else {
             None // default complete
         }
