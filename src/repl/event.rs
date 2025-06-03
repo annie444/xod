@@ -41,7 +41,6 @@ pub struct XodTabEventHandler;
 impl ConditionalEventHandler for XodTabEventHandler {
     fn handle(&self, evt: &Event, n: RepeatCount, _: bool, ctx: &EventContext) -> Option<Cmd> {
         debug_assert_eq!(*evt, Event::from(KeyEvent::from('\t')));
-        eprintln!("{}", n);
         if ctx.line()[..ctx.pos()]
             .chars()
             .next_back()
