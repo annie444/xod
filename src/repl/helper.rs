@@ -1,30 +1,32 @@
 use color_print::cformat;
 use rustyline::{
-    Context, Helper,
+    Context, Helper, Hinter,
     completion::{Candidate, Completer},
     error::ReadlineError,
     highlight::{CmdKind, Highlighter},
-    hint::Hinter,
+    hint::HistoryHinter,
     history::SearchDirection,
     validate::{ValidationContext, ValidationResult, Validator},
 };
 use std::{
     borrow::Cow::{self, Borrowed, Owned},
     cell::Cell,
-    io::Write,
 };
 
-use crate::parsers::{DEBUG_PRINT, Span, general::lines};
+use crate::parsers::{Span, general::lines};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Hinter)]
 pub struct XodHelper {
     bracket: Cell<Option<(u8, usize)>>,
+    #[rustyline(Hinter)]
+    hinter: HistoryHinter,
 }
 
-impl XodHelper {
-    pub fn new() -> Self {
+impl Default for XodHelper {
+    fn default() -> Self {
         Self {
             bracket: Cell::new(None),
+            hinter: HistoryHinter::new(),
         }
     }
 }
@@ -131,9 +133,9 @@ impl Completer for XodHelper {
         let order = balanced(line);
         for d in order {
             let display = match d {
-                Delimiters::Paren(_) => "(".to_string(),
-                Delimiters::Bracket(_) => "[".to_string(),
-                Delimiters::Brace(_) => "{".to_string(),
+                Delimiters::Paren(_) => ")".to_string(),
+                Delimiters::Bracket(_) => "]".to_string(),
+                Delimiters::Brace(_) => "}".to_string(),
             };
             let replacement = display.clone();
             candidates.push(XodCandidate {
@@ -142,32 +144,6 @@ impl Completer for XodHelper {
             });
         }
         Ok((pos, candidates))
-    }
-}
-
-impl Hinter for XodHelper {
-    type Hint = String;
-
-    fn hint(&self, line: &str, pos: usize, ctx: &Context<'_>) -> Option<String> {
-        if line.is_empty() || pos < line.len() {
-            return None;
-        }
-        let start = if ctx.history_index() == ctx.history().len() {
-            ctx.history_index().saturating_sub(1)
-        } else {
-            ctx.history_index()
-        };
-        if let Some(sr) = ctx
-            .history()
-            .starts_with(line, start, SearchDirection::Reverse)
-            .unwrap_or(None)
-        {
-            if sr.entry == line {
-                return None;
-            }
-            return Some(sr.entry[pos..].to_owned());
-        }
-        None
     }
 }
 
@@ -316,7 +292,9 @@ const fn is_close_bracket(bracket: u8) -> bool {
     matches!(bracket, b'}' | b']' | b')')
 }
 
-const FUNCTIONS: [&'static str; 7] = ["exit", "quit", "hex", "bin", "dec", "oct", "bool"];
+const FUNCTIONS: [&str; 12] = [
+    "exit", "quit", "hex", "bin", "dec", "oct", "bool", "clear", "history", "hist", "help", "range",
+];
 
 impl Validator for XodHelper {
     fn validate(&self, ctx: &mut ValidationContext) -> Result<ValidationResult, ReadlineError> {
@@ -359,17 +337,6 @@ fn validate_parse(src: &str) -> ValidationResult {
         Err(e) => match e {
             nom::Err::Incomplete(_) => ValidationResult::Incomplete,
             nom::Err::Error(e) | nom::Err::Failure(e) => {
-                if *DEBUG_PRINT {
-                    let debug_file_path = std::path::Path::new("debug.txt");
-                    let mut debug_file = std::fs::OpenOptions::new()
-                        .append(true)
-                        .create(true)
-                        .open(debug_file_path)
-                        .unwrap();
-                    debug_file
-                        .write_all(format!("Error: {:?}\n", e).as_bytes())
-                        .unwrap();
-                }
                 let mut error = String::new();
                 error.push_str(&cformat!(
                     "\n<s><r!>error</>: {}</>\n",

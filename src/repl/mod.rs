@@ -1,33 +1,33 @@
+pub mod event;
+pub mod help;
 pub mod helper;
 
+use crate::parsers::PartialEvalError;
+use crate::parsers::ast::Line;
 use crate::parsers::{
     EvalError, ExprError, Expression, Span, exprs::NumOrListNoOp, general::lines,
 };
 use crate::utils::print_num;
+use color_print::cformat;
 use rustyline::{
-    Behavior, ColorMode, CompletionType, EditMode, Editor,
+    Behavior, Cmd, ColorMode, CompletionType, Editor, Event, EventHandler, KeyEvent,
     config::Config,
     error::ReadlineError,
     history::{FileHistory, History},
 };
 use shellexpand::tilde;
+use std::collections::VecDeque;
 use std::fs::File;
 use std::path::Path;
 
-use self::helper::XodHelper;
+use self::{
+    event::{XodCompleteHintHandler, XodTabEventHandler},
+    help::print_help,
+    helper::XodHelper,
+};
 
 pub fn run() {
     println!("REPL is not implemented yet.");
-    // Here you would typically set up the REPL loop, read user input,
-    // parse commands, and execute them.
-    // For example:
-    // loop {
-    //     let input = get_user_input();
-    //     match parse_command(input) {
-    //         Ok(command) => execute_command(command),
-    //         Err(e) => println!("Error: {}", e),
-    //     }
-    // }
 
     let file = tilde("~/.local/cache/xod/history").to_string();
     let history_file = Path::new(&file);
@@ -35,15 +35,16 @@ pub fn run() {
         if let Some(parent) = history_file.parent() {
             std::fs::create_dir_all(parent).expect("Failed to create history directory");
         }
-        File::create(&history_file).expect("Failed to create history file");
+        File::create(history_file).expect("Failed to create history file");
         FileHistory::new()
-            .save(&history_file)
+            .save(history_file)
             .expect("Failed to create history file");
     }
     let mut history = FileHistory::new();
     history
-        .load(&history_file)
+        .load(history_file)
         .expect("Failed to load history file");
+
     let config = Config::builder()
         .max_history_size(1000)
         .expect("Failed to set max history size")
@@ -53,7 +54,6 @@ pub fn run() {
         .completion_prompt_limit(50)
         .completion_type(CompletionType::Fuzzy)
         .completion_show_all_if_ambiguous(false)
-        .edit_mode(EditMode::Vi)
         .auto_add_history(true)
         .color_mode(ColorMode::Enabled)
         .behavior(Behavior::PreferTerm)
@@ -63,14 +63,34 @@ pub fn run() {
         .bracketed_paste(true)
         .enable_signals(true)
         .build();
-    let helper = XodHelper::new();
+
+    let helper = XodHelper::default();
+    let complete_handler = Box::new(XodCompleteHintHandler);
+
     let mut rl: Editor<XodHelper, FileHistory> =
         Editor::with_history(config, history).expect("Failed to create editor");
     rl.set_helper(Some(helper));
+    rl.bind_sequence(
+        KeyEvent::ctrl('E'),
+        EventHandler::Conditional(complete_handler.clone()),
+    );
+    rl.bind_sequence(
+        KeyEvent::alt('f'),
+        EventHandler::Conditional(complete_handler),
+    );
+    rl.bind_sequence(
+        Event::KeySeq(vec![KeyEvent::ctrl('X'), KeyEvent::ctrl('E')]),
+        EventHandler::Simple(Cmd::Suspend),
+    );
+    rl.bind_sequence(
+        KeyEvent::from('\t'),
+        EventHandler::Conditional(Box::new(XodTabEventHandler)),
+    );
+
     let mut ctx: Option<String> = None;
     loop {
         let readline = match ctx {
-            Some(ref ctx_ref) => rl.readline_with_initial(">> ", (&ctx_ref, "")),
+            Some(ref ctx_ref) => rl.readline_with_initial(">> ", (ctx_ref, "")),
             None => rl.readline(">> "),
         };
         ctx = None;
@@ -97,49 +117,96 @@ pub fn run() {
                         };
                     }
                 };
-                for parsed_line in &mut parsed_lines {
-                    match parsed_line.eval() {
-                        Ok(result) => match result {
-                            NumOrListNoOp::Num(n) => print_num("Result:", n),
-                            NumOrListNoOp::List(l) => println!("List: {:?}", l),
-                            NumOrListNoOp::NoOp => (),
-                        },
-                        Err(e) => match e {
-                            ExprError::Quit => {
-                                println!("Exiting REPL.");
-                                rl.history_mut()
-                                    .save(&history_file)
-                                    .expect("Failed to save history file");
-                                return;
-                            }
-                            ExprError::Partial(p) => {
-                                eprintln!("{}", EvalError::from((p, body)))
-                            }
-                        },
+                match parse_lines(&mut parsed_lines) {
+                    XodCmd::Help => {
+                        print_help();
+                        continue;
+                    }
+                    XodCmd::History => {
+                        print_history(&rl);
+                        continue;
+                    }
+                    XodCmd::Clear => {
+                        let _ = rl.clear_screen();
+                        continue;
+                    }
+                    XodCmd::Quit => {
+                        println!("Exiting REPL.");
+                        rl.history_mut()
+                            .save(history_file)
+                            .expect("Failed to save history file");
+                        break;
+                    }
+                    XodCmd::NoOp => continue,
+                    XodCmd::Error(e) => {
+                        eprintln!("{}", EvalError::from((e, body)));
+                        continue;
                     }
                 }
             }
             Err(ReadlineError::Interrupted) => {
                 println!("Ctrl-C pressed, exiting REPL.");
                 rl.history_mut()
-                    .save(&history_file)
+                    .save(history_file)
                     .expect("Failed to save history file");
                 break;
             }
             Err(ReadlineError::Eof) => {
                 println!("Ctrl-D pressed, exiting REPL.");
                 rl.history_mut()
-                    .save(&history_file)
+                    .save(history_file)
                     .expect("Failed to save history file");
                 break;
             }
             Err(err) => {
                 println!("Error reading line: {:?}", err);
                 rl.history_mut()
-                    .save(&history_file)
+                    .save(history_file)
                     .expect("Failed to save history file");
                 break;
             }
         }
     }
+}
+
+pub enum XodCmd<'a> {
+    Help,
+    History,
+    Clear,
+    Quit,
+    NoOp,
+    Error(PartialEvalError<'a>),
+}
+
+fn print_history(rl: &Editor<XodHelper, FileHistory>) {
+    let len = rl.history().len();
+    for (i, entry) in rl.history().iter().enumerate() {
+        let i = len - i;
+        let mut entry = entry
+            .split('\n')
+            .map(|s| format!("      {}\n", s))
+            .collect::<String>();
+        entry.replace_range(0..=4, &cformat!("<s><b!>{i: >3}</></> :"));
+        println!("{}", entry);
+    }
+}
+
+fn parse_lines<'a>(parsed_lines: &'a mut VecDeque<Line>) -> XodCmd<'a> {
+    for parsed_line in parsed_lines.iter_mut() {
+        match parsed_line.eval() {
+            Ok(result) => match result {
+                NumOrListNoOp::Num(n) => print_num("", n),
+                NumOrListNoOp::List(l) => println!("{:?}", l),
+                NumOrListNoOp::NoOp => {}
+            },
+            Err(e) => match e {
+                ExprError::Quit => return XodCmd::Quit,
+                ExprError::Help => return XodCmd::Help,
+                ExprError::History => return XodCmd::History,
+                ExprError::Clear => return XodCmd::Clear,
+                ExprError::Partial(p) => return XodCmd::Error(p),
+            },
+        }
+    }
+    XodCmd::NoOp
 }

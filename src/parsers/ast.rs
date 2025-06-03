@@ -1,9 +1,74 @@
-use super::Span;
+use super::{RefSpan, Span};
 use crate::bitops::BitOps;
 use std::{collections::VecDeque, fmt};
 
+pub struct Ast<'a> {
+    pub body: &'static str,
+    pub lines: VecDeque<Line<'a>>,
+}
+
+impl<'a> Ast<'a> {
+    pub fn new(body: &'static str, lines: VecDeque<Line<'a>>) -> Self {
+        Self { body, lines }
+    }
+
+    pub fn add_line(&mut self, line: Line<'a>) {
+        self.lines.push_back(line);
+    }
+
+    pub fn get_line(&mut self) -> Option<Line<'a>> {
+        self.lines.pop_front()
+    }
+}
+
+// (Variabl, Method, Opt<VarNum>)
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Method<'a> {
+    Append(Span<'a>, Span<'a>, VarNum<'a>),
+    Prepend(Span<'a>, Span<'a>, VarNum<'a>),
+    Front(Span<'a>, Span<'a>),
+    Back(Span<'a>, Span<'a>),
+    Index(Span<'a>, Span<'a>, VarNum<'a>),
+}
+
+impl<'a> RefSpan<'a> for Method<'a> {
+    fn get_span<'b>(&self) -> Span<'b>
+    where
+        'a: 'b,
+    {
+        match self {
+            Self::Append(var, _, _) => *var,
+            Self::Prepend(var, _, _) => *var,
+            Self::Front(var, _) => *var,
+            Self::Back(var, _) => *var,
+            Self::Index(var, _, _) => *var,
+        }
+    }
+}
+
+impl fmt::Display for Method<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Append(var, _, num) => write!(f, "{}.append({})", var.fragment(), num),
+            Self::Prepend(var, _, num) => write!(f, "{}.prepend({})", var.fragment(), num),
+            Self::Front(var, _) => write!(f, "{}.front()", var.fragment()),
+            Self::Back(var, _) => write!(f, "{}.back()", var.fragment()),
+            Self::Index(var, _, num) => write!(f, "{}.index({})", var, num),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Number<'a>(pub usize, pub Span<'a>, pub Option<Span<'a>>);
+
+impl<'a> RefSpan<'a> for Number<'a> {
+    fn get_span<'b>(&self) -> Span<'b>
+    where
+        'a: 'b,
+    {
+        self.1
+    }
+}
 
 impl std::fmt::Display for Number<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -52,6 +117,15 @@ pub struct Range<'a> {
     pub end: VarNum<'a>,
 }
 
+impl<'a> RefSpan<'a> for Range<'a> {
+    fn get_span<'b>(&self) -> Span<'b>
+    where
+        'a: 'b,
+    {
+        self.fragment
+    }
+}
+
 impl std::fmt::Display for Range<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}..{}", self.start, self.end)
@@ -73,6 +147,19 @@ pub enum Iter<'a> {
     List(VecDeque<VarNum<'a>>),
     Range(Range<'a>),
     Var(Span<'a>),
+}
+
+impl<'a> RefSpan<'a> for Iter<'a> {
+    fn get_span<'b>(&self) -> Span<'b>
+    where
+        'a: 'b,
+    {
+        match self {
+            Self::List(l) => l.front().map_or(Span::new(""), |v| v.get_span()),
+            Self::Range(r) => r.fragment,
+            Self::Var(v) => *v,
+        }
+    }
 }
 
 impl fmt::Display for Iter<'_> {
@@ -119,6 +206,15 @@ pub struct Loop<'a> {
     pub body: VecDeque<Line<'a>>,
     pub open: Span<'a>,
     pub close: Span<'a>,
+}
+
+impl<'a> RefSpan<'a> for Loop<'a> {
+    fn get_span<'b>(&self) -> Span<'b>
+    where
+        'a: 'b,
+    {
+        self.open
+    }
 }
 
 impl fmt::Display for Loop<'_> {
@@ -184,6 +280,17 @@ pub enum Loops<'a> {
     If(Span<'a>, CompareOp<'a>),
 }
 
+impl<'a> RefSpan<'a> for Loops<'a> {
+    fn get_span<'b>(&self) -> Span<'b>
+    where
+        'a: 'b,
+    {
+        match self {
+            Self::For(span, _, _) | Self::While(span, _) | Self::If(span, _) => *span,
+        }
+    }
+}
+
 impl fmt::Display for Loops<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -198,6 +305,15 @@ impl fmt::Display for Loops<'_> {
 pub struct Variable<'a> {
     pub name: Span<'a>,
     pub value: VarOrVal<'a>,
+}
+
+impl<'a> RefSpan<'a> for Variable<'a> {
+    fn get_span<'b>(&self) -> Span<'b>
+    where
+        'a: 'b,
+    {
+        self.name
+    }
 }
 
 impl fmt::Display for Variable<'_> {
@@ -221,6 +337,25 @@ pub enum VarOrVal<'a> {
     Expr(BitExpr<'a>),
     SepExpr(SepBitExpr<'a>),
     Func(Funcs<'a>),
+    Method(Method<'a>),
+}
+
+impl<'a> RefSpan<'a> for VarOrVal<'a> {
+    fn get_span<'b>(&self) -> Span<'b>
+    where
+        'a: 'b,
+    {
+        match self {
+            Self::Var(v) => *v,
+            Self::Num(n) => n.get_span(),
+            Self::Expr(e) => e.get_span(),
+            Self::Method(m) => m.get_span(),
+            Self::List(l) => l.front().map_or(Span::new(""), |v| v.get_span()),
+            Self::Range(r) => r.fragment,
+            Self::Func(u) => u.get_span(),
+            Self::SepExpr(se) => se.get_span(),
+        }
+    }
 }
 
 impl fmt::Display for VarOrVal<'_> {
@@ -230,6 +365,9 @@ impl fmt::Display for VarOrVal<'_> {
             Self::Num(x) => write!(f, "{}", x),
             Self::Expr(x) => {
                 write!(f, "{}", x)
+            }
+            Self::Method(m) => {
+                write!(f, "{}", m)
             }
             Self::List(l) => {
                 write!(f, "[")?;
@@ -252,6 +390,12 @@ impl fmt::Display for VarOrVal<'_> {
                 write!(f, "{}", se)
             }
         }
+    }
+}
+
+impl<'a> From<Method<'a>> for VarOrVal<'a> {
+    fn from(value: Method<'a>) -> Self {
+        Self::Method(value)
     }
 }
 
@@ -296,10 +440,26 @@ pub enum VarNum<'a> {
     Var(Span<'a>),
     Num(Number<'a>),
     Expr(Box<SepBitExpr<'a>>),
-    Bool(Box<BoolFunc<'a>>),
+    Func(Box<Funcs<'a>>),
+    Method(Box<Method<'a>>),
 }
 
-impl<'a> VarNum<'a> {
+impl<'a> RefSpan<'a> for VarNum<'a> {
+    fn get_span<'b>(&self) -> Span<'b>
+    where
+        'a: 'b,
+    {
+        match self {
+            Self::Var(v) => *v,
+            Self::Num(n) => n.get_span(),
+            Self::Expr(e) => e.get_span(),
+            Self::Func(f) => f.get_span(),
+            Self::Method(m) => m.get_span(),
+        }
+    }
+}
+
+impl VarNum<'_> {
     pub fn is_var(&self) -> bool {
         matches!(self, Self::Var(_))
     }
@@ -311,21 +471,6 @@ impl<'a> VarNum<'a> {
     pub fn is_expr(&self) -> bool {
         matches!(self, Self::Expr(_))
     }
-
-    pub fn fragment<'b>(&self) -> Span<'b>
-    where
-        'a: 'b,
-    {
-        match self {
-            Self::Var(v) => *v,
-            Self::Num(n) => n.1,
-            Self::Expr(e) => e.open,
-            Self::Bool(b) => match &**b {
-                BoolFunc::Compare(c) => c.left.fragment(),
-                BoolFunc::VarNum(v) => v.fragment(),
-            },
-        }
-    }
 }
 
 impl fmt::Display for VarNum<'_> {
@@ -336,14 +481,21 @@ impl fmt::Display for VarNum<'_> {
             Self::Expr(x) => {
                 write!(f, "{}", x)
             }
-            Self::Bool(b) => write!(f, "{}", b),
+            Self::Func(u) => write!(f, "{}", u),
+            Self::Method(m) => write!(f, "{}", m),
         }
     }
 }
 
-impl<'a> From<(Span<'a>, BoolFunc<'a>)> for VarNum<'a> {
-    fn from(value: (Span<'a>, BoolFunc<'a>)) -> Self {
-        Self::Bool(Box::new(value.1))
+impl<'a> From<Method<'a>> for VarNum<'a> {
+    fn from(value: Method<'a>) -> Self {
+        Self::Method(Box::new(value))
+    }
+}
+
+impl<'a> From<Funcs<'a>> for VarNum<'a> {
+    fn from(value: Funcs<'a>) -> Self {
+        Self::Func(Box::new(value))
     }
 }
 
@@ -391,18 +543,73 @@ pub enum Line<'a> {
     Comp(CompareOp<'a>),
     Func(Funcs<'a>),
     Loop(Loop<'a>),
+    Method(Method<'a>),
+}
+
+impl<'a> RefSpan<'a> for Line<'a> {
+    fn get_span<'b>(&self) -> Span<'b>
+    where
+        'a: 'b,
+    {
+        match self {
+            Self::Empty => Span::new(""),
+            Self::Variable(v) => v.get_span(),
+            Self::Expr(e) => e.get_span(),
+            Self::Comp(c) => c.get_span(),
+            Self::Func(u) => u.get_span(),
+            Self::Loop(l) => l.get_span(),
+            Self::Method(m) => m.get_span(),
+        }
+    }
+}
+
+impl Line<'_> {
+    pub fn is_empty(&self) -> bool {
+        matches!(self, Self::Empty)
+    }
+
+    pub fn is_variable(&self) -> bool {
+        matches!(self, Self::Variable(_))
+    }
+
+    pub fn is_expr(&self) -> bool {
+        matches!(self, Self::Expr(_))
+    }
+
+    pub fn is_comp(&self) -> bool {
+        matches!(self, Self::Comp(_))
+    }
+
+    pub fn is_func(&self) -> bool {
+        matches!(self, Self::Func(_))
+    }
+
+    pub fn is_loop(&self) -> bool {
+        matches!(self, Self::Loop(_))
+    }
+
+    pub fn is_method(&self) -> bool {
+        matches!(self, Self::Method(_))
+    }
 }
 
 impl fmt::Display for Line<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Empty => writeln!(f),
-            Self::Variable(v) => writeln!(f, "{};", v),
-            Self::Expr(e) => writeln!(f, "{};", e),
-            Self::Comp(c) => writeln!(f, "{};", c),
-            Self::Func(u) => write!(f, "{};", u),
-            Self::Loop(l) => write!(f, "{};", l),
+            Self::Variable(v) => writeln!(f, "{}", v),
+            Self::Expr(e) => writeln!(f, "{}", e),
+            Self::Comp(c) => writeln!(f, "{}", c),
+            Self::Func(u) => writeln!(f, "{}", u),
+            Self::Loop(l) => writeln!(f, "{}", l),
+            Self::Method(m) => writeln!(f, "{}", m),
         }
+    }
+}
+
+impl<'a> From<Method<'a>> for Line<'a> {
+    fn from(value: Method<'a>) -> Self {
+        Self::Method(value)
     }
 }
 
@@ -440,10 +647,32 @@ impl<'a> From<Loop<'a>> for Line<'a> {
 pub enum Funcs<'a> {
     Bool(Span<'a>, BoolFunc<'a>),
     Quit(Span<'a>),
+    Help(Span<'a>),
+    History(Span<'a>),
+    Clear(Span<'a>),
     Hex(Span<'a>, VarNum<'a>),
     Bin(Span<'a>, VarNum<'a>),
     Oct(Span<'a>, VarNum<'a>),
     Dec(Span<'a>, VarNum<'a>),
+}
+
+impl<'a> RefSpan<'a> for Funcs<'a> {
+    fn get_span<'b>(&self) -> Span<'b>
+    where
+        'a: 'b,
+    {
+        match self {
+            Self::Bool(span, _)
+            | Self::Quit(span)
+            | Self::History(span)
+            | Self::Clear(span)
+            | Self::Hex(span, _)
+            | Self::Bin(span, _)
+            | Self::Oct(span, _)
+            | Self::Dec(span, _)
+            | Self::Help(span) => *span,
+        }
+    }
 }
 
 impl fmt::Display for Funcs<'_> {
@@ -455,6 +684,9 @@ impl fmt::Display for Funcs<'_> {
             Self::Bin(_, v) => write!(f, "bin({})", v),
             Self::Oct(_, v) => write!(f, "oct({})", v),
             Self::Dec(_, v) => write!(f, "dec({})", v),
+            Self::Help(_) => write!(f, "help()"),
+            Self::History(_) => write!(f, "history()"),
+            Self::Clear(_) => write!(f, "clear()"),
         }
     }
 }
@@ -469,6 +701,18 @@ impl<'a> From<(Span<'a>, BoolFunc<'a>)> for Funcs<'a> {
 pub enum BoolFunc<'a> {
     Compare(CompareOp<'a>),
     VarNum(VarNum<'a>),
+}
+
+impl<'a> RefSpan<'a> for BoolFunc<'a> {
+    fn get_span<'b>(&self) -> Span<'b>
+    where
+        'a: 'b,
+    {
+        match self {
+            Self::Compare(c) => c.get_span(),
+            Self::VarNum(v) => v.get_span(),
+        }
+    }
 }
 
 impl fmt::Display for BoolFunc<'_> {
@@ -523,6 +767,15 @@ pub struct CompareOp<'a> {
     pub right: VarNum<'a>,
 }
 
+impl<'a> RefSpan<'a> for CompareOp<'a> {
+    fn get_span<'b>(&self) -> Span<'b>
+    where
+        'a: 'b,
+    {
+        self.op_span
+    }
+}
+
 impl fmt::Display for CompareOp<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{} {} {}", self.left, self.op, self.right)
@@ -546,6 +799,15 @@ pub struct BitExpr<'a> {
     pub op: BitOps,
     pub op_span: Span<'a>,
     pub right: Option<VarNum<'a>>,
+}
+
+impl<'a> RefSpan<'a> for BitExpr<'a> {
+    fn get_span<'b>(&self) -> Span<'b>
+    where
+        'a: 'b,
+    {
+        self.op_span
+    }
 }
 
 impl<'a> BitExpr<'a> {
@@ -574,6 +836,15 @@ pub struct SepBitExpr<'a> {
     pub open: Span<'a>,
     pub expr: BitExpr<'a>,
     pub close: Span<'a>,
+}
+
+impl<'a> RefSpan<'a> for SepBitExpr<'a> {
+    fn get_span<'b>(&self) -> Span<'b>
+    where
+        'a: 'b,
+    {
+        self.expr.get_span()
+    }
 }
 
 impl<'a> SepBitExpr<'a> {

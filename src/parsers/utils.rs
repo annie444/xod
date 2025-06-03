@@ -1,4 +1,4 @@
-use super::{DEBUG_PRINT, Span};
+use super::Span;
 use nom::{
     IResult, Parser,
     bytes::complete::tag,
@@ -29,57 +29,36 @@ pub fn opt_multispace0(input: Span) -> IResult<Span, ()> {
 
 #[inline(always)]
 pub fn open_bracket(input: Span) -> IResult<Span, Span> {
-    if *DEBUG_PRINT {
-        eprintln!("Parsing input for an open bracket:{}", input);
-    }
     terminated(tag("["), opt_multispace0).parse_complete(input)
 }
 
 #[inline(always)]
 pub fn close_bracket(input: Span) -> IResult<Span, Span> {
-    if *DEBUG_PRINT {
-        eprintln!("Parsing input for a close bracket:{}", input);
-    }
     preceded(opt_multispace0, tag("]")).parse_complete(input)
 }
 
 #[inline(always)]
 pub fn open_paren(input: Span) -> IResult<Span, Span> {
-    if *DEBUG_PRINT {
-        eprintln!("Parsing input for an open parenthese:{}", input);
-    }
     terminated(tag("("), opt_multispace0).parse_complete(input)
 }
 
 #[inline(always)]
 pub fn close_paren(input: Span) -> IResult<Span, Span> {
-    if *DEBUG_PRINT {
-        eprintln!("Parsing input for a close parenthese:{}", input);
-    }
     preceded(opt_multispace0, tag(")")).parse_complete(input)
 }
 
 #[inline(always)]
 pub fn open_brace(input: Span) -> IResult<Span, Span> {
-    if *DEBUG_PRINT {
-        eprintln!("Parsing input for an open curly brace:{}", input);
-    }
     space_around(tag("{")).parse_complete(input)
 }
 
 #[inline(always)]
 pub fn close_brace(input: Span) -> IResult<Span, Span> {
-    if *DEBUG_PRINT {
-        eprintln!("Parsing input for a close curly brace:{}", input);
-    }
     space_around(tag("}")).parse_complete(input)
 }
 
 #[inline(always)]
 pub fn comma(input: Span) -> IResult<Span, Span> {
-    if *DEBUG_PRINT {
-        eprintln!("Parsing input for a comma separator:{}", input);
-    }
     terminated(tag(","), opt_multispace0).parse_complete(input)
 }
 

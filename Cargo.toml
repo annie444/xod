@@ -12,9 +12,25 @@ dirs = "6.0.0"
 lazy_static = "1.5.0"
 nom = "8.0.0"
 nom_locate = { version = "5.0.0", features = ["runtime-dispatch-simd"] }
-rustyline = { version = "16.0.0", features = ["case_insensitive_history_search", "with-fuzzy"] }
+prettytable-rs = "0.10.0"
+rustyline = { version = "16.0.0", features = [
+  "case_insensitive_history_search",
+  "with-fuzzy",
+  "custom-bindings",
+  "derive",
+] }
 shellexpand = "3.1.1"
 thiserror = "2.0.12"
 
 [dev-dependencies]
 anyhow = { version = "1.0.98", features = ["backtrace"] }
+
+[profile.dev]
+debug = true
+opt-level = 3
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

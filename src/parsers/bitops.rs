@@ -1,5 +1,5 @@
 use super::{
-    DEBUG_PRINT, Span,
+    Span,
     ast::{BitExpr, SepBitExpr},
     general::var_or_num,
     utils::{close_paren, open_paren, opt_multispace0},
@@ -41,16 +41,10 @@ pub fn bit_right(input: Span) -> IResult<Span, (BitOps, Span)> {
 }
 
 pub fn dual_bit_ops(input: Span) -> IResult<Span, (BitOps, Span)> {
-    if *DEBUG_PRINT {
-        eprintln!("Parsing input for a dual bit operation:{}", input);
-    }
     alt((bit_or, bit_xor, bit_and, bit_left, bit_right)).parse_complete(input)
 }
 
 pub fn dual_expr(input: Span) -> IResult<Span, BitExpr> {
-    if *DEBUG_PRINT {
-        eprintln!("Parsing input for a dual expression:{}", input);
-    }
     let (input, left) = terminated(var_or_num, opt_multispace0).parse_complete(input)?;
     let (input, (op, op_span)) = terminated(dual_bit_ops, opt_multispace0).parse_complete(input)?;
     let (input, right) = var_or_num(input)?;
@@ -58,26 +52,17 @@ pub fn dual_expr(input: Span) -> IResult<Span, BitExpr> {
 }
 
 pub fn single_expr(input: Span) -> IResult<Span, BitExpr> {
-    if *DEBUG_PRINT {
-        eprintln!("Parsing input for a single expression:{}", input);
-    }
     let (input, (op, op_span)) = terminated(bit_not, opt_multispace0).parse_complete(input)?;
     let (input, left) = var_or_num(input)?;
     Ok((input, BitExpr::new(left, op, op_span, None)))
 }
 
 pub fn expr(input: Span) -> IResult<Span, BitExpr> {
-    if *DEBUG_PRINT {
-        eprintln!("Parsing input for a raw expression:{}", input);
-    }
     let (input, _) = multispace0(input)?;
     alt((dual_expr, single_expr)).parse_complete(input)
 }
 
 pub fn sep_expr(input: Span) -> IResult<Span, SepBitExpr> {
-    if *DEBUG_PRINT {
-        eprintln!("Parsing input for a separated expression:{}", input);
-    }
     let (input, open) = open_paren(input)?;
     let (input, expr) = expr(input)?;
     let (input, close) = close_paren(input)?;

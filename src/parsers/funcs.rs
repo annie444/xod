@@ -1,5 +1,5 @@
 use super::{
-    DEBUG_PRINT, Span,
+    Span,
     ast::{BoolFunc, Funcs, Range},
     compare::compare,
     general::var_or_num,
@@ -15,17 +15,11 @@ use nom::{
 };
 
 pub fn bool_tag(input: Span) -> IResult<Span, Span> {
-    if *DEBUG_PRINT {
-        eprintln!("Parsing input for a bool tag:{}", input);
-    }
     let (input, func) = tag("bool").parse_complete(input)?;
     Ok((input, func))
 }
 
 pub fn bool_func(input: Span) -> IResult<Span, (Span, BoolFunc)> {
-    if *DEBUG_PRINT {
-        eprintln!("Parsing input for a bool function:{}", input);
-    }
     let (input, (func, body)) = (
         terminated(bool_tag, open_paren),
         terminated(alt((into(compare), into(var_or_num))), close_paren),
@@ -34,35 +28,56 @@ pub fn bool_func(input: Span) -> IResult<Span, (Span, BoolFunc)> {
     Ok((input, (func, body)))
 }
 
-pub fn quit_tag(input: Span) -> IResult<Span, Span> {
-    if *DEBUG_PRINT {
-        eprintln!("Parsing input for a bool tag:{}", input);
-    }
+fn history_tag(input: Span) -> IResult<Span, Span> {
+    let (input, func) = alt((tag("history"), tag("hist"))).parse_complete(input)?;
+    Ok((input, func))
+}
+
+pub fn history_func(input: Span) -> IResult<Span, Funcs> {
+    let (input, func) =
+        terminated(history_tag, pair(open_paren, close_paren)).parse_complete(input)?;
+    Ok((input, Funcs::History(func)))
+}
+
+fn clear_tag(input: Span) -> IResult<Span, Span> {
+    let (input, func) = tag("clear").parse_complete(input)?;
+    Ok((input, func))
+}
+
+pub fn clear_func(input: Span) -> IResult<Span, Funcs> {
+    let (input, func) =
+        terminated(clear_tag, pair(open_paren, close_paren)).parse_complete(input)?;
+    Ok((input, Funcs::Clear(func)))
+}
+
+fn quit_tag(input: Span) -> IResult<Span, Span> {
     let (input, func) = alt((tag("quit"), tag("exit"))).parse_complete(input)?;
     Ok((input, func))
 }
 
 pub fn quit_func(input: Span) -> IResult<Span, Funcs> {
-    if *DEBUG_PRINT {
-        eprintln!("Parsing input for a quit function:{}", input);
-    }
     let (input, func) =
         terminated(quit_tag, pair(open_paren, close_paren)).parse_complete(input)?;
     Ok((input, Funcs::Quit(func)))
 }
 
+fn help_tag(input: Span) -> IResult<Span, Span> {
+    let (input, func) = tag("help").parse_complete(input)?;
+    Ok((input, func))
+}
+
+pub fn help_func(input: Span) -> IResult<Span, Funcs> {
+    let (input, func) =
+        terminated(help_tag, pair(open_paren, close_paren)).parse_complete(input)?;
+    Ok((input, Funcs::Help(func)))
+}
+
 pub fn hex_tag(input: Span) -> IResult<Span, Span> {
-    if *DEBUG_PRINT {
-        eprintln!("Parsing input for a hex tag:{}", input);
-    }
     let (input, func) = tag("hex").parse_complete(input)?;
     Ok((input, func))
 }
 
 pub fn hex_func(input: Span) -> IResult<Span, Funcs> {
-    if *DEBUG_PRINT {
-        eprintln!("Parsing input for a hex function:{}", input);
-    }
     let (input, (func, body)) = (
         terminated(hex_tag, open_paren),
         terminated(var_or_num, close_paren),
@@ -72,17 +87,11 @@ pub fn hex_func(input: Span) -> IResult<Span, Funcs> {
 }
 
 pub fn bin_tag(input: Span) -> IResult<Span, Span> {
-    if *DEBUG_PRINT {
-        eprintln!("Parsing input for a hex tag:{}", input);
-    }
     let (input, func) = tag("bin").parse_complete(input)?;
     Ok((input, func))
 }
 
 pub fn bin_func(input: Span) -> IResult<Span, Funcs> {
-    if *DEBUG_PRINT {
-        eprintln!("Parsing input for a hex function:{}", input);
-    }
     let (input, (func, body)) = (
         terminated(bin_tag, open_paren),
         terminated(var_or_num, close_paren),
@@ -92,17 +101,11 @@ pub fn bin_func(input: Span) -> IResult<Span, Funcs> {
 }
 
 pub fn oct_tag(input: Span) -> IResult<Span, Span> {
-    if *DEBUG_PRINT {
-        eprintln!("Parsing input for a hex tag:{}", input);
-    }
     let (input, func) = tag("oct").parse_complete(input)?;
     Ok((input, func))
 }
 
 pub fn oct_func(input: Span) -> IResult<Span, Funcs> {
-    if *DEBUG_PRINT {
-        eprintln!("Parsing input for a hex function:{}", input);
-    }
     let (input, (func, body)) = (
         terminated(oct_tag, open_paren),
         terminated(var_or_num, close_paren),
@@ -112,17 +115,11 @@ pub fn oct_func(input: Span) -> IResult<Span, Funcs> {
 }
 
 pub fn dec_tag(input: Span) -> IResult<Span, Span> {
-    if *DEBUG_PRINT {
-        eprintln!("Parsing input for a hex tag:{}", input);
-    }
     let (input, func) = tag("dec").parse_complete(input)?;
     Ok((input, func))
 }
 
 pub fn dec_func(input: Span) -> IResult<Span, Funcs> {
-    if *DEBUG_PRINT {
-        eprintln!("Parsing input for a hex function:{}", input);
-    }
     let (input, (func, body)) = (
         terminated(dec_tag, open_paren),
         terminated(var_or_num, close_paren),
@@ -132,25 +129,22 @@ pub fn dec_func(input: Span) -> IResult<Span, Funcs> {
 }
 
 pub fn funcs(input: Span) -> IResult<Span, Funcs> {
-    if *DEBUG_PRINT {
-        eprintln!("Parsing input for a function:{}", input);
-    }
     let (input, _) = multispace0(input)?;
     alt((
         into(bool_func),
         quit_func,
+        history_func,
+        clear_func,
         hex_func,
         oct_func,
         bin_func,
         dec_func,
+        help_func,
     ))
     .parse_complete(input)
 }
 
 pub fn range_func(input: Span) -> IResult<Span, Range> {
-    if *DEBUG_PRINT {
-        eprintln!("Parsing input for a range function:{}", input);
-    }
     let (input, (func, (start, end))) = (
         terminated(tag("range"), open_paren),
         terminated(separated_pair(var_or_num, comma, var_or_num), close_paren),

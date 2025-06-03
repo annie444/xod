@@ -1,5 +1,5 @@
 use super::{
-    DEBUG_PRINT, Span,
+    Span,
     ast::{Compare, CompareOp},
     general::var_or_num,
     utils::space_around,
@@ -37,9 +37,6 @@ pub fn lesser_equal(input: Span) -> IResult<Span, (Compare, Span)> {
 }
 
 pub fn operator(input: Span) -> IResult<Span, (Compare, Span)> {
-    if *DEBUG_PRINT {
-        eprintln!("Parsing input for a boolean operator:{}", input);
-    }
     alt((
         equals,
         not_equals,
@@ -52,9 +49,6 @@ pub fn operator(input: Span) -> IResult<Span, (Compare, Span)> {
 }
 
 pub fn compare(input: Span) -> IResult<Span, CompareOp> {
-    if *DEBUG_PRINT {
-        eprintln!("Parsing input for a boolean expression:{}", input);
-    }
     let (input, left) = space_around(var_or_num).parse_complete(input)?;
     let (input, (op, op_span)) = space_around(operator).parse_complete(input)?;
     let (input, right) = var_or_num(input)?;

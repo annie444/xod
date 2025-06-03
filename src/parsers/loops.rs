@@ -1,5 +1,5 @@
 use super::{
-    DEBUG_PRINT, Span,
+    Span,
     ast::{Iter, Line, Loop, Loops, VarNum},
     compare::compare,
     funcs::range_func,
@@ -18,13 +18,9 @@ use nom::{
     multi::{many0, separated_list0},
     sequence::{delimited, preceded, terminated},
 };
-use std::collections::VecDeque;
-use std::sync::Mutex;
+use std::{collections::VecDeque, sync::Mutex};
 
 pub fn for_loop(input: Span) -> IResult<Span, Loop> {
-    if *DEBUG_PRINT {
-        eprintln!("Parsing input for a for loop:{}", input);
-    }
     let (input, (loop_tag, (inner_name, loop_val), open)) = preceded(
         multispace0,
         (
@@ -45,9 +41,6 @@ pub fn for_loop(input: Span) -> IResult<Span, Loop> {
 }
 
 pub fn list(input: Span) -> IResult<Span, VecDeque<VarNum>> {
-    if *DEBUG_PRINT {
-        eprintln!("Parsing input for a list:{}", input);
-    }
     let (input, list) = delimited(
         preceded(opt_multispace0, open_bracket),
         separated_list0(comma, var_or_num),
@@ -58,12 +51,6 @@ pub fn list(input: Span) -> IResult<Span, VecDeque<VarNum>> {
 }
 
 fn for_inner(input: Span) -> IResult<Span, (Span, Iter)> {
-    if *DEBUG_PRINT {
-        eprintln!(
-            "Parsing input for the inner section of the for loop:{}",
-            input
-        );
-    }
     let (input, name) = terminated(var_name, opt_multispace0).parse_complete(input)?;
     let (input, _) = terminated(tag("in"), opt_multispace0).parse_complete(input)?;
     let (input, i) = alt((into(list), into(range_func), into(var_name))).parse_complete(input)?;
@@ -71,9 +58,6 @@ fn for_inner(input: Span) -> IResult<Span, (Span, Iter)> {
 }
 
 pub fn while_loop(input: Span) -> IResult<Span, Loop> {
-    if *DEBUG_PRINT {
-        eprintln!("Parsing input for a while loop:{}", input);
-    }
     let (input, (loop_tag, op, open)) = preceded(
         multispace0,
         (
@@ -89,9 +73,6 @@ pub fn while_loop(input: Span) -> IResult<Span, Loop> {
 }
 
 pub fn if_stmt(input: Span) -> IResult<Span, Loop> {
-    if *DEBUG_PRINT {
-        eprintln!("Parsing input for an if statement:{}", input);
-    }
     let (input, (loop_tag, op, open)) = preceded(
         multispace0,
         (
@@ -107,9 +88,6 @@ pub fn if_stmt(input: Span) -> IResult<Span, Loop> {
 }
 
 pub fn loops(input: Span) -> IResult<Span, Loop> {
-    if *DEBUG_PRINT {
-        eprintln!("Parsing input for a loop:{}", input);
-    }
     preceded(multispace0, alt((if_stmt, while_loop, for_loop))).parse_complete(input)
 }
 
@@ -137,9 +115,6 @@ fn brace_count() -> impl Fn(char) -> bool {
 }
 
 pub fn loop_body(input: Span<'_>) -> IResult<Span<'_>, (VecDeque<Line<'_>>, Span<'_>)> {
-    if *DEBUG_PRINT {
-        eprintln!("Parsing input for the lines for the loop body:{}", input);
-    }
     let (input, loop_input) = take_till1(brace_count()).parse_complete(input)?;
     let (input, brace) = close_brace(input)?;
     let (_, i) = terminated(into(many0(line)), eof).parse_complete(loop_input)?;

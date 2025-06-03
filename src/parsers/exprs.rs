@@ -1,10 +1,10 @@
 use std::{collections::VecDeque, fmt};
 
 use super::{
-    DEBUG_PRINT, ExprError, Expression, PartialEvalError, Span, VARIABLES,
+    ExprError, Expression, PartialEvalError, RefSpan, Span, VARIABLES,
     ast::{
-        BitExpr, BoolFunc, Compare, CompareOp, Funcs, Iter, Line, Loop, Loops, Number, Range,
-        SepBitExpr, VarNum, VarOrVal, Variable,
+        BitExpr, BoolFunc, Compare, CompareOp, Funcs, Iter, Line, Loop, Loops, Method, Number,
+        Range, SepBitExpr, VarNum, VarOrVal, Variable,
     },
 };
 use crate::bitops::BitOps;
@@ -76,14 +76,69 @@ impl TryFrom<NumOrListNoOp> for NumOrList {
     }
 }
 
-fn get_num(num: NumOrList, span: Span) -> Result<usize, ExprError> {
+fn get_num(
+    num: NumOrList,
+    var: Span,
+    msg: Option<String>,
+    fix: Option<String>,
+) -> Result<usize, ExprError> {
     match num {
         NumOrList::Num(n) => Ok(n),
-        NumOrList::List(_) => Err(ExprError::Partial(PartialEvalError {
-            loc: span.to_owned(),
-            msg: "Expected a number, but got a list.".to_owned(),
-            fix: "Use a list operation to access elements.".to_owned(),
-        })),
+        NumOrList::List(_) => match (msg, fix) {
+            (Some(msg), Some(fix)) => Err(ExprError::Partial(PartialEvalError {
+                loc: var.to_owned(),
+                msg,
+                fix,
+            })),
+            (Some(msg), None) => Err(ExprError::Partial(PartialEvalError {
+                loc: var.to_owned(),
+                msg,
+                fix: "Use a list operation to access elements.".to_owned(),
+            })),
+            (None, Some(fix)) => Err(ExprError::Partial(PartialEvalError {
+                loc: var.to_owned(),
+                msg: "Expected a number, but got a list.".to_owned(),
+                fix,
+            })),
+            (None, None) => Err(ExprError::Partial(PartialEvalError {
+                loc: var.to_owned(),
+                msg: "Expected a number, but got a list.".to_owned(),
+                fix: "Use a list operation to access elements.".to_owned(),
+            })),
+        },
+    }
+}
+
+fn get_list(
+    list: NumOrList,
+    var: Span,
+    msg: Option<String>,
+    fix: Option<String>,
+) -> Result<VecDeque<usize>, ExprError> {
+    match list {
+        NumOrList::List(list) => Ok(list),
+        NumOrList::Num(_) => match (msg, fix) {
+            (Some(msg), Some(fix)) => Err(ExprError::Partial(PartialEvalError {
+                loc: var.to_owned(),
+                msg,
+                fix,
+            })),
+            (Some(msg), None) => Err(ExprError::Partial(PartialEvalError {
+                loc: var.to_owned(),
+                msg,
+                fix: format!("Try wrapping the number in brackets `[{}]`", var),
+            })),
+            (None, Some(fix)) => Err(ExprError::Partial(PartialEvalError {
+                loc: var.to_owned(),
+                msg: "Expected a list, but got a number.".to_owned(),
+                fix,
+            })),
+            (None, None) => Err(ExprError::Partial(PartialEvalError {
+                loc: var.to_owned(),
+                msg: "Expected a list, but got a number.".to_owned(),
+                fix: format!("Try wrapping the number in brackets `[{}]`", var),
+            })),
+        },
     }
 }
 
@@ -133,6 +188,69 @@ fn set_var(var: Span, value: NumOrList) -> Result<(), ExprError> {
     }
 }
 
+impl<'b, 'a: 'b> Expression<'a, 'b, NumOrList> for Method<'a> {
+    fn eval(&'b mut self) -> Result<NumOrList, ExprError<'a>> {
+        match self {
+            Self::Append(var, _, value) => {
+                let list = get_var(*var)?;
+                let mut list = get_list(list, *var, None, None)?;
+                let value = get_num(value.eval()?, value.get_span(), None, None)?;
+                list.push_back(value);
+                set_var(*var, NumOrList::List(list.clone()))?;
+                Ok(NumOrList::List(list))
+            }
+            Self::Prepend(var, _, value) => {
+                let list = get_var(*var)?;
+                let mut list = get_list(list, *var, None, None)?;
+                let value = get_num(value.eval()?, value.get_span(), None, None)?;
+                list.push_front(value);
+                set_var(*var, NumOrList::List(list.clone()))?;
+                Ok(NumOrList::List(list))
+            }
+            Self::Front(var, _) => {
+                let list = get_var(*var)?;
+                let mut list = get_list(list, *var, None, None)?;
+                let num = list.pop_front().ok_or_else(|| {
+                    ExprError::Partial(PartialEvalError {
+                        loc: *var,
+                        msg: "List is empty, cannot get front element.".to_owned(),
+                        fix: "Ensure the list is not empty before calling front.".to_owned(),
+                    })
+                })?;
+                set_var(*var, NumOrList::List(list))?;
+                Ok(NumOrList::Num(num))
+            }
+            Self::Back(var, _) => {
+                let list = get_var(*var)?;
+                let mut list = get_list(list, *var, None, None)?;
+                let num = list.pop_back().ok_or_else(|| {
+                    ExprError::Partial(PartialEvalError {
+                        loc: *var,
+                        msg: "List is empty, cannot get front element.".to_owned(),
+                        fix: "Ensure the list is not empty before calling front.".to_owned(),
+                    })
+                })?;
+                set_var(*var, NumOrList::List(list))?;
+                Ok(NumOrList::Num(num))
+            }
+            Self::Index(var, _, value) => {
+                let list = get_var(*var)?;
+                let list = get_list(list, *var, None, None)?;
+                let index = get_num(value.eval()?, value.get_span(), None, None)?;
+                if index >= list.len() {
+                    return Err(ExprError::Partial(PartialEvalError {
+                        loc: value.get_span().to_owned(),
+                        msg: "Index out of bounds.".to_owned(),
+                        fix: format!("{}.index({})", var.fragment(), list.len() - 1),
+                    }));
+                }
+                let num = list[index];
+                Ok(NumOrList::Num(num))
+            }
+        }
+    }
+}
+
 impl<'b, 'a: 'b> Expression<'a, 'b, usize> for Number<'a> {
     fn eval(&'b mut self) -> Result<usize, ExprError<'a>> {
         Ok(self.0)
@@ -141,12 +259,12 @@ impl<'b, 'a: 'b> Expression<'a, 'b, usize> for Number<'a> {
 
 impl<'b, 'a: 'b> Expression<'a, 'b, std::ops::Range<usize>> for Range<'a> {
     fn eval(&'b mut self) -> Result<std::ops::Range<usize>, ExprError<'a>> {
-        let start_span = self.start.fragment().to_owned();
-        let start = get_num(self.start.eval()?, start_span)?;
-        let end_span = self.end.fragment().to_owned();
-        let end = get_num(self.end.eval()?, end_span)?;
+        let start_span = self.start.get_span().to_owned();
+        let start = get_num(self.start.eval()?, start_span, None, None)?;
+        let end_span = self.end.get_span().to_owned();
+        let end = get_num(self.end.eval()?, end_span, None, None)?;
         match start.cmp(&end) {
-            std::cmp::Ordering::Less => Err(PartialEvalError {
+            std::cmp::Ordering::Greater => Err(PartialEvalError {
                 loc: start_span,
                 msg: "Start of range is greater than end.".to_owned(),
                 fix: format!("{}..{}", end, start),
@@ -279,7 +397,27 @@ impl<'b, 'a: 'b> Expression<'a, 'b, AnyIterator<'a>> for Iter<'a> {
                         }
                         VarNum::Num(num) => deque.push_back(num.eval()?),
                         VarNum::Expr(expr) => deque.push_back(expr.eval()?),
-                        VarNum::Bool(b) => deque.push_back(b.eval()?),
+                        VarNum::Func(b) => deque.push_back(get_num(
+                            b.eval()?,
+                            b.get_span(),
+                            Some(format!(
+                                "`{}` returns a list, not a number.",
+                                b.get_span().fragment()
+                            )),
+                            None,
+                        )?),
+                        VarNum::Method(b) => deque.push_back(get_num(
+                            b.eval()?,
+                            b.get_span(),
+                            Some(format!(
+                                "`{}` returns a list, not a number.",
+                                b.get_span().fragment()
+                            )),
+                            Some(
+                                "Try using `.front()` or `.back()` to get a single element."
+                                    .to_owned(),
+                            ),
+                        )?),
                     }
                 }
                 Ok(AnyIterator::List(None, deque))
@@ -319,13 +457,11 @@ impl<'b, 'a: 'b> Expression<'a, 'b, AnyIterator<'a>> for Loops<'a> {
             Loops::For(_, var, iter) => {
                 let mut iter = iter.eval()?;
                 iter.set_var(*var);
-                if *DEBUG_PRINT {
-                    eprintln!(
-                        "Evaluating loop for variable: {} over iterator {:?}",
-                        var.fragment(),
-                        iter
-                    );
-                }
+                dbg!(
+                    "Evaluating loop for variable: {} over iterator {:?}",
+                    var.fragment(),
+                    &iter
+                );
                 Ok(iter)
             }
             Loops::While(_, op) => Ok(AnyIterator::Expr(None, false, op.clone())),
@@ -345,6 +481,7 @@ impl<'b, 'a: 'b> Expression<'a, 'b, ()> for Variable<'a> {
 impl<'b, 'a: 'b> Expression<'a, 'b, NumOrList> for VarOrVal<'a> {
     fn eval(&'b mut self) -> Result<NumOrList, ExprError<'a>> {
         match self {
+            VarOrVal::Method(m) => m.eval(),
             VarOrVal::Var(var) => get_var(*var),
             VarOrVal::Num(num) => Ok(NumOrList::Num(num.eval()?)),
             VarOrVal::List(list) => {
@@ -363,7 +500,23 @@ impl<'b, 'a: 'b> Expression<'a, 'b, NumOrList> for VarOrVal<'a> {
                         }
                         VarNum::Num(num) => deque.push_back(num.eval()?),
                         VarNum::Expr(expr) => deque.push_back(expr.eval()?),
-                        VarNum::Bool(b) => deque.push_back(b.eval()?),
+                        VarNum::Func(b) => {
+                            deque.push_back(get_num(b.eval()?, b.get_span(), None, None)?)
+                        }
+                        VarNum::Method(b) => {
+                            deque.push_back(get_num(
+                                b.eval()?,
+                                b.get_span(),
+                                Some(format!(
+                                    "`{}` returns a list, not a number.",
+                                    b.get_span().fragment()
+                                )),
+                                Some(
+                                    "Try using `.front()` or `.back()` to get a single element."
+                                        .to_owned(),
+                                ),
+                            )?);
+                        }
                     }
                 }
                 Ok(NumOrList::List(deque))
@@ -371,20 +524,13 @@ impl<'b, 'a: 'b> Expression<'a, 'b, NumOrList> for VarOrVal<'a> {
             VarOrVal::Range(range) => Ok(NumOrList::List(range.eval()?.collect())),
             VarOrVal::Expr(expr) => expr.eval().map(NumOrList::Num),
             VarOrVal::SepExpr(sep_expr) => sep_expr.eval().map(NumOrList::Num),
-            VarOrVal::Func(func) => match func.eval()?.try_into() {
+            VarOrVal::Func(func) => match func.eval() {
                 Ok(num_or_list) => Ok(num_or_list),
-                Err(_) => match func {
-                    Funcs::Quit(f)
-                    | Funcs::Bool(f, _)
-                    | Funcs::Dec(f, _)
-                    | Funcs::Hex(f, _)
-                    | Funcs::Oct(f, _)
-                    | Funcs::Bin(f, _) => Err(ExprError::Partial(PartialEvalError {
-                        loc: f.to_owned(),
-                        msg: "Function did not return a number or list.".to_owned(),
-                        fix: "Ensure the function returns a valid number or list.".to_owned(),
-                    })),
-                },
+                Err(_) => Err(ExprError::Partial(PartialEvalError {
+                    loc: func.get_span(),
+                    msg: "Function did not return a number or list.".to_owned(),
+                    fix: "Ensure the function returns a valid number or list.".to_owned(),
+                })),
             },
         }
     }
@@ -396,7 +542,8 @@ impl<'b, 'a: 'b> Expression<'a, 'b, NumOrList> for VarNum<'a> {
             VarNum::Var(var) => get_var(*var),
             VarNum::Num(num) => Ok(NumOrList::Num(num.eval()?)),
             VarNum::Expr(expr) => expr.eval().map(NumOrList::Num),
-            VarNum::Bool(b) => b.eval().map(NumOrList::Num),
+            VarNum::Func(b) => b.eval(),
+            VarNum::Method(b) => b.eval(),
         }
     }
 }
@@ -410,21 +557,25 @@ impl<'b, 'a: 'b> Expression<'a, 'b, NumOrListNoOp> for Line<'a> {
             Line::Expr(expr) => expr.eval().map(NumOrListNoOp::Num),
             Line::Comp(op) => op.eval().map(NumOrListNoOp::Num),
             Line::Func(func) => func.eval().map(NumOrListNoOp::from),
+            Line::Method(m) => m.eval().map(NumOrListNoOp::from),
         }
     }
 }
 
-impl<'b, 'a: 'b> Expression<'a, 'b, NumOrListNoOp> for Funcs<'a> {
-    fn eval(&'b mut self) -> Result<NumOrListNoOp, ExprError<'a>> {
+impl<'b, 'a: 'b> Expression<'a, 'b, NumOrList> for Funcs<'a> {
+    fn eval(&'b mut self) -> Result<NumOrList, ExprError<'a>> {
         match self {
             Self::Quit(_) => Err(ExprError::Quit),
-            Self::Bool(_, op) => op.eval().map(NumOrListNoOp::Num),
+            Self::Help(_) => Err(ExprError::Help),
+            Self::History(_) => Err(ExprError::History),
+            Self::Clear(_) => Err(ExprError::Clear),
+            Self::Bool(_, op) => op.eval().map(NumOrList::Num),
             Self::Dec(_, var) => {
                 let var = var.eval()?;
                 match var {
                     NumOrList::Num(num) => {
                         println!("{}", num);
-                        Ok(NumOrListNoOp::NoOp)
+                        Ok(NumOrList::Num(num))
                     }
                     NumOrList::List(list) => {
                         let len = list.len() - 1;
@@ -438,7 +589,7 @@ impl<'b, 'a: 'b> Expression<'a, 'b, NumOrListNoOp> for Funcs<'a> {
                         }
                         p.push(']');
                         println!("{}", p);
-                        Ok(NumOrListNoOp::NoOp)
+                        Ok(NumOrList::List(list))
                     }
                 }
             }
@@ -447,7 +598,7 @@ impl<'b, 'a: 'b> Expression<'a, 'b, NumOrListNoOp> for Funcs<'a> {
                 match var {
                     NumOrList::Num(num) => {
                         println!("0x{:x}", num);
-                        Ok(NumOrListNoOp::NoOp)
+                        Ok(NumOrList::Num(num))
                     }
                     NumOrList::List(list) => {
                         let len = list.len() - 1;
@@ -461,7 +612,7 @@ impl<'b, 'a: 'b> Expression<'a, 'b, NumOrListNoOp> for Funcs<'a> {
                         }
                         p.push(']');
                         println!("{}", p);
-                        Ok(NumOrListNoOp::NoOp)
+                        Ok(NumOrList::List(list))
                     }
                 }
             }
@@ -470,7 +621,7 @@ impl<'b, 'a: 'b> Expression<'a, 'b, NumOrListNoOp> for Funcs<'a> {
                 match var {
                     NumOrList::Num(num) => {
                         println!("0o{:o}", num);
-                        Ok(NumOrListNoOp::NoOp)
+                        Ok(NumOrList::Num(num))
                     }
                     NumOrList::List(list) => {
                         let len = list.len() - 1;
@@ -484,7 +635,7 @@ impl<'b, 'a: 'b> Expression<'a, 'b, NumOrListNoOp> for Funcs<'a> {
                         }
                         p.push(']');
                         println!("{}", p);
-                        Ok(NumOrListNoOp::NoOp)
+                        Ok(NumOrList::List(list))
                     }
                 }
             }
@@ -493,7 +644,7 @@ impl<'b, 'a: 'b> Expression<'a, 'b, NumOrListNoOp> for Funcs<'a> {
                 match var {
                     NumOrList::Num(num) => {
                         println!("0b{:b}", num);
-                        Ok(NumOrListNoOp::NoOp)
+                        Ok(NumOrList::Num(num))
                     }
                     NumOrList::List(list) => {
                         let len = list.len() - 1;
@@ -507,7 +658,7 @@ impl<'b, 'a: 'b> Expression<'a, 'b, NumOrListNoOp> for Funcs<'a> {
                         }
                         p.push(']');
                         println!("{}", p);
-                        Ok(NumOrListNoOp::NoOp)
+                        Ok(NumOrList::List(list))
                     }
                 }
             }
@@ -520,8 +671,8 @@ impl<'b, 'a: 'b> Expression<'a, 'b, usize> for BoolFunc<'a> {
         match self {
             Self::Compare(op) => op.eval(),
             Self::VarNum(var) => {
-                let num_fragment = var.fragment().to_owned();
-                let num = get_num(var.eval()?, num_fragment)?;
+                let num_fragment = var.get_span().to_owned();
+                let num = get_num(var.eval()?, num_fragment, None, None)?;
                 if num >= 1 { Ok(1) } else { Ok(0) }
             }
         }
@@ -530,8 +681,8 @@ impl<'b, 'a: 'b> Expression<'a, 'b, usize> for BoolFunc<'a> {
 
 impl<'b, 'a: 'b> Expression<'a, 'b, usize> for CompareOp<'a> {
     fn eval(&'b mut self) -> Result<usize, ExprError<'a>> {
-        let left = get_num(self.left.eval()?, self.op_span)?;
-        let right = get_num(self.right.eval()?, self.op_span)?;
+        let left = get_num(self.left.eval()?, self.op_span, None, None)?;
+        let right = get_num(self.right.eval()?, self.op_span, None, None)?;
         match self.op {
             Compare::Equal => Ok((left == right) as usize),
             Compare::NotEqual => Ok((left != right) as usize),
@@ -545,12 +696,12 @@ impl<'b, 'a: 'b> Expression<'a, 'b, usize> for CompareOp<'a> {
 
 impl<'b, 'a: 'b> Expression<'a, 'b, usize> for BitExpr<'a> {
     fn eval(&'b mut self) -> Result<usize, ExprError<'a>> {
-        let left = get_num(self.left.eval()?, self.op_span)?;
+        let left = get_num(self.left.eval()?, self.op_span, None, None)?;
         match self.op {
             BitOps::Not => Ok(!left),
             _ => {
                 if let Some(ref mut right) = self.right {
-                    let right = get_num(right.eval()?, self.op_span)?;
+                    let right = get_num(right.eval()?, self.op_span, None, None)?;
                     match self.op {
                         BitOps::LeftShift => Ok(left << right),
                         BitOps::And => Ok(left & right),

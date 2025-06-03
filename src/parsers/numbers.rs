@@ -1,4 +1,4 @@
-use super::{DEBUG_PRINT, Span, ast::Number, utils::opt_multispace0};
+use super::{Span, ast::Number, utils::opt_multispace0};
 use nom::{
     IResult, Parser,
     branch::alt,
@@ -68,49 +68,31 @@ fn bin_tag(input: Span) -> IResult<Span, Span> {
 }
 
 pub fn hex_num(input: Span) -> IResult<Span, Number> {
-    if *DEBUG_PRINT {
-        eprintln!("Parsing input for a hexadecimal number:{}", input);
-    }
     let (input, span1) = hex_tag(input)?;
     let (input, (number, span2)) = get_hex_num(input)?;
     Ok((input, Number::new(number, span2, Some(span1))))
 }
 
 pub fn oct_num(input: Span) -> IResult<Span, Number> {
-    if *DEBUG_PRINT {
-        eprintln!("Parsing input for a octal number:{}", input);
-    }
     let (input, span1) = oct_tag(input)?;
     let (input, (number, span2)) = (get_oct_num).parse_complete(input)?;
     Ok((input, Number::new(number, span2, Some(span1))))
 }
 
 pub fn bin_num(input: Span) -> IResult<Span, Number> {
-    if *DEBUG_PRINT {
-        eprintln!("Parsing input for a binary number:{}", input);
-    }
     let (input, span1) = bin_tag(input)?;
     let (input, (number, span2)) = (get_bin_num).parse_complete(input)?;
     Ok((input, Number::new(number, span2, Some(span1))))
 }
 
 pub fn dec_num(input: Span) -> IResult<Span, Number> {
-    if *DEBUG_PRINT {
-        eprintln!("Parsing input for a decimal number:{}", input);
-    }
     let (input, (number, span)) = (get_dec_num).parse_complete(input)?;
     Ok((input, Number::new(number, span, None)))
 }
 
 pub fn num(input: Span) -> IResult<Span, Number> {
-    if *DEBUG_PRINT {
-        eprintln!("Parsing input for a number:{}", input);
-    }
     let (input, number) = preceded(opt_multispace0, alt((hex_num, oct_num, bin_num, dec_num)))
         .parse_complete(input)?;
-    if *DEBUG_PRINT {
-        eprintln!("Parsed input for a number:{}, {}", input, number);
-    }
     Ok((input, number))
 }
 

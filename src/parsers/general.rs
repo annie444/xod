@@ -1,12 +1,12 @@
 use super::{
-    DEBUG_PRINT, Span,
-    ast::{Line, VarNum, VarOrVal, Variable},
+    Span,
+    ast::{Line, Method, VarNum, VarOrVal, Variable},
     bitops::{expr, sep_expr},
     compare::compare,
-    funcs::{bool_func, funcs, range_func},
+    funcs::{funcs, range_func},
     loops::{list, loops},
     numbers::num,
-    utils::space_around,
+    utils::{close_paren, open_paren, space_around},
 };
 use nom::{
     IResult, Parser,
@@ -15,21 +15,15 @@ use nom::{
     character::complete::{alpha1, alphanumeric1, char, multispace0, space0},
     combinator::{eof, into, recognize},
     multi::{many0, many1},
-    sequence::{pair, terminated},
+    sequence::{delimited, pair, terminated},
 };
 use std::collections::VecDeque;
 
 pub fn assign(input: Span) -> IResult<Span, char> {
-    if *DEBUG_PRINT {
-        eprintln!("Parsing input for a assignment char:{}", input);
-    }
     char('=').parse_complete(input)
 }
 
 pub fn var_name(input: Span) -> IResult<Span, Span> {
-    if *DEBUG_PRINT {
-        eprintln!("Parsing input for a variable name:{}", input);
-    }
     recognize(pair(
         alt((alpha1, tag("_"))),
         many0(alt((alphanumeric1, tag("_")))),
@@ -38,19 +32,21 @@ pub fn var_name(input: Span) -> IResult<Span, Span> {
 }
 
 pub fn var_or_num(input: Span) -> IResult<Span, VarNum> {
-    if *DEBUG_PRINT {
-        eprintln!("Parsing input for a VarNum:{}", input);
-    }
-    alt((into(num), into(bool_func), into(var_name), into(sep_expr))).parse_complete(input)
+    alt((
+        into(num),
+        into(funcs),
+        into(method),
+        into(var_name),
+        into(sep_expr),
+    ))
+    .parse_complete(input)
 }
 
 pub fn var_or_val(input: Span) -> IResult<Span, VarOrVal> {
-    if *DEBUG_PRINT {
-        eprintln!("Parsing input for a VarOrVal:{}", input);
-    }
     alt((
         into(range_func),
         into(list),
+        into(method),
         into(funcs),
         into(expr),
         into(sep_expr),
@@ -61,9 +57,6 @@ pub fn var_or_val(input: Span) -> IResult<Span, VarOrVal> {
 }
 
 pub fn variable(input: Span) -> IResult<Span, Variable> {
-    if *DEBUG_PRINT {
-        eprintln!("Parsing input for a variable assignment:{}", input);
-    }
     let (input, name) = space_around(var_name).parse_complete(input)?;
     let (input, _) = space_around(assign).parse_complete(input)?;
     let (input, value) = var_or_val(input)?;
@@ -71,20 +64,11 @@ pub fn variable(input: Span) -> IResult<Span, Variable> {
 }
 
 pub fn empty_line(input: Span) -> IResult<Span, Line> {
-    if *DEBUG_PRINT {
-        eprintln!("Parsing input for an empty line:{}", input);
-    }
     let (input, _) = many0(space0).parse_complete(input)?;
     let input_str = input.fragment();
     if input_str.split_whitespace().all(|s| s.is_empty()) {
-        if *DEBUG_PRINT {
-            eprintln!("Input is empty");
-        }
         Ok((input, Line::Empty))
     } else {
-        if *DEBUG_PRINT {
-            eprintln!("Input is not empty");
-        }
         Err(nom::Err::Error(nom::error::Error::new(
             input,
             nom::error::ErrorKind::NonEmpty,
@@ -92,18 +76,74 @@ pub fn empty_line(input: Span) -> IResult<Span, Line> {
     }
 }
 
+fn append(input: Span) -> IResult<Span, Method> {
+    let (input, (var, method, arg)) = (
+        var_name,
+        delimited(char('.'), tag("append"), open_paren),
+        terminated(var_or_num, close_paren),
+    )
+        .parse_complete(input)?;
+    Ok((input, Method::Append(var, method, arg)))
+}
+
+fn prepend(input: Span) -> IResult<Span, Method> {
+    let (input, (var, method, arg)) = (
+        var_name,
+        delimited(char('.'), tag("prepend"), open_paren),
+        terminated(var_or_num, close_paren),
+    )
+        .parse_complete(input)?;
+    Ok((input, Method::Prepend(var, method, arg)))
+}
+
+fn front(input: Span) -> IResult<Span, Method> {
+    let (input, (var, method)) = (
+        var_name,
+        terminated(
+            delimited(char('.'), alt((tag("front"), tag("pop"))), open_paren),
+            close_paren,
+        ),
+    )
+        .parse_complete(input)?;
+    Ok((input, Method::Front(var, method)))
+}
+
+fn back(input: Span) -> IResult<Span, Method> {
+    let (input, (var, method)) = (
+        var_name,
+        terminated(
+            delimited(char('.'), alt((tag("back"), tag("pop_back"))), open_paren),
+            close_paren,
+        ),
+    )
+        .parse_complete(input)?;
+    Ok((input, Method::Back(var, method)))
+}
+
+fn index(input: Span) -> IResult<Span, Method> {
+    let (input, (var, method, arg)) = (
+        var_name,
+        delimited(char('.'), alt((tag("index"), tag("get"))), open_paren),
+        terminated(var_or_num, close_paren),
+    )
+        .parse_complete(input)?;
+    Ok((input, Method::Index(var, method, arg)))
+}
+
+pub fn method(input: Span) -> IResult<Span, Method> {
+    alt((append, prepend, index, front, back)).parse_complete(input)
+}
+
 pub fn line(input: Span) -> IResult<Span, Line> {
-    if *DEBUG_PRINT {
-        eprintln!("Parsing input for a line:{}", input);
-    }
     terminated(
         alt((
-            empty_line,
-            into(variable),
-            into(compare),
-            into(funcs),
-            into(expr),
-            into(loops),
+            empty_line,     // red
+            into(method),   // yellow
+            into(variable), // cyan
+            into(compare),  // green
+            into(funcs),    // blue
+            into(expr),     // magenta
+            into(loops),    // orange
         )),
         multispace0,
     )
@@ -111,9 +151,6 @@ pub fn line(input: Span) -> IResult<Span, Line> {
 }
 
 pub fn lines(input: Span) -> IResult<Span, VecDeque<Line>> {
-    if *DEBUG_PRINT {
-        eprintln!("Parsing input for many lines:{}", input);
-    }
     terminated(into(many1(line)), eof).parse_complete(input)
 }
 
@@ -127,16 +164,182 @@ mod test {
     use super::*;
 
     #[test]
+    fn test_methods() {
+        let input = r#"
+someList = [1, 2, 3, 4, 5]
+someList.append(6)
+someList.prepend(0)
+a = someList.index(3)
+b = someList.get(4)
+c = someList.front()
+e = someList.pop()
+d = someList.back()
+f = someList.pop_back()
+"#;
+        let span = Span::new(input);
+        let result = lines(span);
+        assert!(result.is_ok(), "Failed to parse methods: {:#?}", result);
+        let (remaining, lines) = result.unwrap();
+        assert_eq!(
+            remaining.fragment(),
+            &"",
+            "Did not consume all input {:#?}",
+            (remaining, lines)
+        );
+        assert_eq!(
+            lines.len(),
+            9,
+            "Expected 7 lines, found {}: {:#?}",
+            lines.len(),
+            (remaining, lines)
+        );
+
+        // Check the first line
+        if let Line::Variable(var) = &lines[0] {
+            assert_eq!(
+                var.name.fragment(),
+                &"someList",
+                "First variable name mismatch: {:#?}",
+                var,
+            );
+            if let VarOrVal::List(list) = &var.value {
+                assert_eq!(list.len(), 5, "Expected list of length 5: {:#?}", list);
+            } else {
+                panic!("Expected VarOrVal::List for someList: {:#?}", var);
+            }
+        } else {
+            panic!(
+                "Expected first line to be a Variable assignment, instead found: {:#?}",
+                lines[0]
+            );
+        }
+
+        // Check the second line
+        if let Line::Method(method) = &lines[1] {
+            assert!(
+                matches!(method, Method::Append(_, _, _)),
+                "Expected the append method: {:#?}",
+                method,
+            );
+        } else {
+            panic!(
+                "Expected second line to be a method, instead found: {:#?}",
+                lines[0]
+            );
+        }
+
+        // Check the third line
+        if let Line::Method(method) = &lines[2] {
+            assert!(
+                matches!(method, Method::Prepend(_, _, _)),
+                "Expected the prepend method: {:#?}",
+                method,
+            );
+        } else {
+            panic!(
+                "Expected second line to be a method, instead found: {:#?}",
+                lines[0]
+            );
+        }
+
+        // Check the fourth and fifth line
+        for i in 3..=4 {
+            if let Line::Variable(var) = &lines[i] {
+                assert!(
+                    var.name.fragment() == &"a" || var.name.fragment() == &"b",
+                    "Expected variable `a` or `b`: {:#?}",
+                    var,
+                );
+                if let VarOrVal::Method(method) = &var.value {
+                    assert!(
+                        matches!(method, Method::Index(_, _, _)),
+                        "Expected the index method: {:#?}",
+                        method,
+                    );
+                } else {
+                    panic!(
+                        "Expected VarOrVal::Method for assignment of variable `a` or `b`: {:#?}",
+                        var
+                    );
+                }
+            } else {
+                panic!(
+                    "Expected line to be a Variable assignment, instead found: {:#?}",
+                    lines[i]
+                );
+            }
+        }
+
+        // Check the sixth and seventh line
+        for i in 5..=6 {
+            if let Line::Variable(var) = &lines[i] {
+                assert!(
+                    var.name.fragment() == &"c" || var.name.fragment() == &"e",
+                    "Expected variable `c` or `e`: {:#?}",
+                    var,
+                );
+                if let VarOrVal::Method(method) = &var.value {
+                    assert!(
+                        matches!(method, Method::Front(_, _)),
+                        "Expected the front method: {:#?}",
+                        method,
+                    );
+                } else {
+                    panic!(
+                        "Expected VarOrVal::Method for assignment of variable `c` or `e`: {:#?}",
+                        var
+                    );
+                }
+            } else {
+                panic!(
+                    "Expected line to be a Variable assignment, instead found: {:#?}",
+                    lines[i]
+                );
+            }
+        }
+
+        // Check the eighth and ninth line
+        for i in 7..=8 {
+            if let Line::Variable(var) = &lines[i] {
+                assert!(
+                    var.name.fragment() == &"d" || var.name.fragment() == &"f",
+                    "Expected variable `d` or `f`: {:#?}",
+                    var,
+                );
+                if let VarOrVal::Method(method) = &var.value {
+                    assert!(
+                        matches!(method, Method::Back(_, _)),
+                        "Expected the back method: {:#?}",
+                        method,
+                    );
+                } else {
+                    panic!(
+                        "Expected VarOrVal::Method for assignment of variable `d` or `f`: {:#?}",
+                        var
+                    );
+                }
+            } else {
+                panic!(
+                    "Expected line to be a Variable assignment, instead found: {:#?}",
+                    lines[i]
+                );
+            }
+        }
+    }
+
+    #[test]
     fn test_nested_loops() {
         unsafe {
             let input = Span::new(
                 r#"
 var = [0, 1, 1, 0, 0, 1]
+results = []
 n = 0
 for (i in var) {
     n = n >> 1
     if (i == 6) {
         n = n | 0x800
+        results.append(hex(n))
     }
     hex(n)
 }
@@ -185,72 +388,84 @@ for (i in var) {
                 ),
             )));
             lines.push_back(Line::Variable(Variable::new(
-                Span::new_from_raw_offset(26, 3, "n", ()),
+                Span::new_from_raw_offset(26, 3, "results", ()),
+                VarOrVal::List(VecDeque::new()),
+            )));
+            lines.push_back(Line::Variable(Variable::new(
+                Span::new_from_raw_offset(39, 4, "n", ()),
                 VarOrVal::Num(Number::new(
                     0,
-                    Span::new_from_raw_offset(30, 3, "0", ()),
+                    Span::new_from_raw_offset(43, 4, "0", ()),
                     None,
                 )),
             )));
             let mut for_loop = Loop::new(
                 Loops::For(
-                    Span::new_from_raw_offset(32, 4, "for", ()),
-                    Span::new_from_raw_offset(37, 4, "i", ()),
-                    Iter::Var(Span::new_from_raw_offset(42, 4, "var", ())),
+                    Span::new_from_raw_offset(45, 5, "for", ()),
+                    Span::new_from_raw_offset(50, 5, "i", ()),
+                    Iter::Var(Span::new_from_raw_offset(55, 5, "var", ())),
                 ),
-                Span::new_from_raw_offset(47, 4, "{", ()),
-                Span::new_from_raw_offset(121, 10, "}", ()),
+                Span::new_from_raw_offset(60, 5, "{", ()),
+                Span::new_from_raw_offset(165, 12, "}", ()),
             );
             for_loop.add_line(Line::Variable(Variable::new(
-                Span::new_from_raw_offset(53, 5, "n", ()),
+                Span::new_from_raw_offset(66, 6, "n", ()),
                 VarOrVal::Expr(BitExpr::new(
-                    VarNum::Var(Span::new_from_raw_offset(57, 5, "n", ())),
+                    VarNum::Var(Span::new_from_raw_offset(70, 6, "n", ())),
                     BitOps::RightShift,
-                    Span::new_from_raw_offset(59, 5, ">>", ()),
+                    Span::new_from_raw_offset(72, 6, ">>", ()),
                     Some(VarNum::Num(Number::new(
                         1,
-                        Span::new_from_raw_offset(62, 5, "1", ()),
+                        Span::new_from_raw_offset(75, 6, "1", ()),
                         None,
                     ))),
                 )),
             )));
             let mut if_loop = Loop::new(
                 Loops::If(
-                    Span::new_from_raw_offset(68, 6, "if", ()),
+                    Span::new_from_raw_offset(81, 7, "if", ()),
                     CompareOp::new(
-                        VarNum::Var(Span::new_from_raw_offset(72, 6, "i", ())),
+                        VarNum::Var(Span::new_from_raw_offset(85, 7, "i", ())),
                         Compare::Equal,
-                        Span::new_from_raw_offset(74, 6, "==", ()),
+                        Span::new_from_raw_offset(87, 7, "==", ()),
                         VarNum::Num(Number::new(
                             6,
-                            Span::new_from_raw_offset(77, 6, "6", ()),
+                            Span::new_from_raw_offset(90, 7, "6", ()),
                             None,
                         )),
                     ),
                 ),
-                Span::new_from_raw_offset(80, 6, "{", ()),
-                Span::new_from_raw_offset(108, 8, "}", ()),
+                Span::new_from_raw_offset(93, 7, "{", ()),
+                Span::new_from_raw_offset(152, 10, "}", ()),
             );
             if_loop.add_line(Line::Variable(Variable::new(
-                Span::new_from_raw_offset(90, 7, "n", ()),
+                Span::new_from_raw_offset(103, 8, "n", ()),
                 VarOrVal::Expr(BitExpr::new(
-                    VarNum::Var(Span::new_from_raw_offset(94, 7, "n", ())),
+                    VarNum::Var(Span::new_from_raw_offset(107, 8, "n", ())),
                     BitOps::Or,
-                    Span::new_from_raw_offset(96, 7, "|", ()),
+                    Span::new_from_raw_offset(109, 8, "|", ()),
                     Some(VarNum::Num(Number::new(
                         2048,
-                        Span::new_from_raw_offset(100, 7, "800", ()),
-                        Some(Span::new_from_raw_offset(98, 7, "0x", ())),
+                        Span::new_from_raw_offset(113, 8, "800", ()),
+                        Some(Span::new_from_raw_offset(111, 8, "0x", ())),
                     ))),
                 )),
             )));
+            if_loop.add_line(Line::Method(Method::Append(
+                Span::new_from_raw_offset(125, 9, "results", ()),
+                Span::new_from_raw_offset(133, 9, "append", ()),
+                VarNum::Func(Box::new(Funcs::Hex(
+                    Span::new_from_raw_offset(140, 9, "hex", ()),
+                    VarNum::Var(Span::new_from_raw_offset(144, 9, "n", ())),
+                ))),
+            )));
             for_loop.add_line(Line::Loop(if_loop));
             for_loop.add_line(Line::Func(Funcs::Hex(
-                Span::new_from_raw_offset(114, 9, "hex", ()),
-                VarNum::Var(Span::new_from_raw_offset(118, 9, "n", ())),
+                Span::new_from_raw_offset(158, 11, "hex", ()),
+                VarNum::Var(Span::new_from_raw_offset(162, 11, "n", ())),
             )));
             lines.push_back(Line::Loop(for_loop));
-            assert_eq!(result, (Span::new_from_raw_offset(123, 11, "", ()), lines))
+            assert_eq!(result, (Span::new_from_raw_offset(167, 13, "", ()), lines))
         }
     }
 
