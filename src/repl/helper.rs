@@ -1,3 +1,4 @@
+use crate::parsers::{Span, general::lines};
 use color_print::cformat;
 use rustyline::{
     Context, Helper, Hinter,
@@ -8,25 +9,20 @@ use rustyline::{
     history::SearchDirection,
     validate::{ValidationContext, ValidationResult, Validator},
 };
-use std::{
-    borrow::Cow::{self, Borrowed, Owned},
-    cell::Cell,
-};
-
-use crate::parsers::{Span, general::lines};
+use std::{borrow::Cow, cell::Cell};
 
 #[derive(Hinter)]
 pub struct XodHelper {
-    bracket: Cell<Option<(u8, usize)>>,
     #[rustyline(Hinter)]
     hinter: HistoryHinter,
+    bracket: Cell<Option<(u8, usize)>>, // (bracket, position)
 }
 
 impl Default for XodHelper {
     fn default() -> Self {
         Self {
-            bracket: Cell::new(None),
             hinter: HistoryHinter::new(),
+            bracket: Cell::new(None),
         }
     }
 }
@@ -150,39 +146,17 @@ impl Completer for XodHelper {
 impl Highlighter for XodHelper {
     fn highlight<'l>(&self, line: &'l str, _pos: usize) -> Cow<'l, str> {
         if line.len() <= 1 {
-            return Borrowed(line);
+            return Cow::Borrowed(line);
         }
         // highlight matching brace/bracket/parenthesis if it exists
         if let Some((bracket, pos)) = self.bracket.get() {
             if let Some((matching, idx)) = find_matching_bracket(line, pos, bracket) {
                 let mut copy = line.to_owned();
-                copy.replace_range(idx..=idx, &cformat!("<s><b>{}</></>", matching as char));
-                return Owned(copy);
+                copy.replace_range(idx..=idx, &cformat!("<s><g>{}</></>", matching as char));
+                return Cow::Owned(copy);
             }
         }
-        Borrowed(line)
-    }
-
-    fn highlight_prompt<'b, 's: 'b, 'p: 'b>(
-        &'b self,
-        prompt: &'p str,
-        default: bool,
-    ) -> Cow<'b, str> {
-        if prompt.is_empty() {
-            return Borrowed(prompt);
-        }
-        if default {
-            let copy = cformat!("<s><c!>{}</></>", prompt);
-            Owned(copy)
-        } else {
-            let copy = cformat!("<s><m!>{}</></>", prompt);
-            Owned(copy)
-        }
-    }
-
-    fn highlight_hint<'h>(&self, hint: &'h str) -> Cow<'h, str> {
-        let hint = cformat!("<dim>{}</>", hint);
-        Owned(hint)
+        Cow::Borrowed(line)
     }
 
     fn highlight_char(&self, line: &str, pos: usize, kind: CmdKind) -> bool {
@@ -193,6 +167,25 @@ impl Highlighter for XodHelper {
         // will highlight matching brace/bracket/parenthesis if it exists
         self.bracket.set(check_bracket(line, pos));
         self.bracket.get().is_some()
+    }
+
+    fn highlight_hint<'h>(&self, hint: &'h str) -> Cow<'h, str> {
+        // Highlight the hint with a specific style
+        Cow::Owned(cformat!("<dim><i>{hint}</></>"))
+    }
+
+    fn highlight_prompt<'b, 's: 'b, 'p: 'b>(
+        &'s self,
+        prompt: &'p str,
+        default: bool,
+    ) -> Cow<'b, str> {
+        if default {
+            // Highlight the prompt if it's the default prompt
+            Cow::Owned(cformat!("<s><c>{prompt}</></>"))
+        } else {
+            // If not the default prompt, return it as is
+            Cow::Owned(cformat!("<s><m>{prompt}</></>"))
+        }
     }
 }
 

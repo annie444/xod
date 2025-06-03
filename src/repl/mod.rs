@@ -8,7 +8,7 @@ use crate::parsers::{
     EvalError, ExprError, Expression, Span, exprs::NumOrListNoOp, general::lines,
 };
 use crate::utils::print_num;
-use color_print::cformat;
+use color_print::{cformat, cprintln};
 use rustyline::{
     Behavior, Cmd, ColorMode, CompletionType, Editor, Event, EventHandler, KeyEvent,
     config::Config,
@@ -28,6 +28,17 @@ use self::{
 
 pub fn run() {
     println!("REPL is not implemented yet.");
+    cprintln!(
+        r#"
+<s><m>Welcome to the Xod REPL!</></>
+
+    This REPL allows you to evaluate bitwise expressions interactively. 
+    You can enter any valid Xod expression, and it will be evaluated immediately.
+
+    Type <s><g>help()</></> for a list of commands and a breakdown of the syntax.
+    Type <s><g>exit()</></> to exit the REPL.
+"#
+    );
 
     let file = tilde("~/.local/cache/xod/history").to_string();
     let history_file = Path::new(&file);
@@ -186,7 +197,7 @@ fn print_history(rl: &Editor<XodHelper, FileHistory>) {
             .split('\n')
             .map(|s| format!("      {}\n", s))
             .collect::<String>();
-        entry.replace_range(0..=4, &cformat!("<s><b!>{i: >3}</></> :"));
+        entry.replace_range(0..=4, &cformat!("<s><b>{i: >3}</></> :"));
         println!("{}", entry);
     }
 }

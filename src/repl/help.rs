@@ -45,7 +45,7 @@ pub fn print_help() {
 
     cprintln!(
         r#"
-<s><m!>Welcome to the Xod REPL!</></>
+<s><m>Welcome to the Xod REPL!</></>
 
     This REPL allows you to evaluate bitwise expressions interactively. You can enter any valid Xod expression, and it will be evaluated immediately. Below is a breakdown of the domain specific language (DSL) and commands available in this REPL: 
 

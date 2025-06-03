@@ -4,12 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-anyhow = "1.0.98"
-backtrace = { version = "0.3.75", features = ["dbghelp", "coresymbolication"] }
 clap = { version = "4.5.39", features = ["derive"] }
 color-print = { version = "0.3.7", features = ["terminfo"] }
-dirs = "6.0.0"
-lazy_static = "1.5.0"
 nom = "8.0.0"
 nom_locate = { version = "5.0.0", features = ["runtime-dispatch-simd"] }
 prettytable-rs = "0.10.0"
@@ -21,9 +17,6 @@ rustyline = { version = "16.0.0", features = [
 ] }
 shellexpand = "3.1.1"
 thiserror = "2.0.12"
-
-[dev-dependencies]
-anyhow = { version = "1.0.98", features = ["backtrace"] }
 
 [profile.dev]
 debug = true
