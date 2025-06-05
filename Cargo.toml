@@ -2,6 +2,14 @@
 name = "xod"
 version = "1.0.0"
 edition = "2024"
+authors = ["Annie Ehler <annie.ehler.4@gmail.com>"]
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/annie444/xod"
+description = "A tiny REPL for bitwise arithmetic and expression evaluation."
+categories = ["cli", "repl", "bitwise", "arithmetic"]
+documentation = "https://github.com/annie444/xod"
+keywords = ["repl", "bitwise", "arithmetic", "cli"]
 
 [dependencies]
 clap = { version = "4.5.39", features = ["derive"] }
