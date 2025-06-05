@@ -7,7 +7,7 @@ license = "MIT OR Apache-2.0"
 readme = "README.md"
 repository = "https://github.com/annie444/xod"
 description = "A tiny REPL for bitwise arithmetic and expression evaluation."
-categories = ["cli", "repl", "bitwise", "arithmetic"]
+categories = ["command-line-utilities", "compilers", "mathematics"]
 documentation = "https://github.com/annie444/xod"
 keywords = ["repl", "bitwise", "arithmetic", "cli"]
 
