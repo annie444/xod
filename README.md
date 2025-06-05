@@ -17,10 +17,10 @@ Xod is a minimal scripting language and interactive REPL designed for experiment
 
 ### Xod supports:
 
-- Operators: &, |, ^, ~, <<, >>, +, -, \*, /, %, \*\*
-- Booleans: ==, !=, <, <=, >, >=
-- List Methods: append, prepend, front, back, index
-- Builtin Commands: hex(), bin(), log(base, value), range(start, end), etc.
+- Operators: `&`, `|`, `^`, `~`, `<<`, `>>`, `+`, `-`, `*`, `/`, `%`, `**`
+- Booleans: `==`, `!=`, `<`, `<=`, `>`, `>=`
+- List Methods: `append`, `prepend`, `front`, `back`, `index`
+- Builtin Commands: `hex()`, `bin()`, `log(base`, `value)`, `range(start`, `end)`, etc.
 - Control Flow:
 
 ```c
