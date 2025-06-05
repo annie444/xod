@@ -48,6 +48,12 @@ fn print_nums(args: HexOctBin) {
             BitOps::Or => number | other,
             BitOps::RightShift => number >> other,
             BitOps::And => number & other,
+            BitOps::Add => number + other,
+            BitOps::Subtract => number - other,
+            BitOps::Divide => number / other,
+            BitOps::Multiply => number * other,
+            BitOps::Modulo => number % other,
+            BitOps::Expo => number.pow(other as u32),
         };
         print_num("Other Number:", other);
         print_num("Resulting Value:", result);

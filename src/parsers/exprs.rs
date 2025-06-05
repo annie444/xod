@@ -565,6 +565,22 @@ impl<'b, 'a: 'b> Expression<'a, 'b, NumOrList> for Funcs<'a> {
             Self::History(_) => Err(ExprError::History),
             Self::Clear(_) => Err(ExprError::Clear),
             Self::Bool(_, op) => op.eval().map(NumOrList::Num),
+            Self::Log(_, var1, var2) => {
+                let left = get_num(
+                    var1.eval()?,
+                    var1.get_span(),
+                    Some("Cannot use a list as the base for a log operation".to_string()),
+                    None,
+                )?;
+                let right = get_num(
+                    var2.eval()?,
+                    var2.get_span(),
+                    Some("Cannot take a log of a list".to_string()),
+                    Some("Try iterating over the list".to_string()),
+                )?;
+                let result = (left as f64).log(right as f64).floor();
+                Ok(NumOrList::Num(result as usize))
+            }
             Self::Dec(_, var) => {
                 let var = var.eval()?;
                 match var {
@@ -703,7 +719,43 @@ impl<'b, 'a: 'b> Expression<'a, 'b, usize> for BitExpr<'a> {
                         BitOps::Xor => Ok(left ^ right),
                         BitOps::RightShift => Ok(left >> right),
                         BitOps::Or => Ok(left | right),
-                        _ => unreachable!(),
+                        BitOps::Add => Ok(left.wrapping_add(right)),
+                        BitOps::Subtract => Ok(left.wrapping_sub(right)),
+                        BitOps::Divide => {
+                            if right == 0 {
+                                Err(ExprError::Partial(PartialEvalError {
+                                    msg: "Division by zero is not allowed.".to_owned(),
+                                    fix: "Use a non-zero divisor.".to_owned(),
+                                    loc: self.op_span.to_owned(),
+                                }))
+                            } else {
+                                Ok(left.wrapping_div(right))
+                            }
+                        }
+                        BitOps::Multiply => Ok(left.wrapping_mul(right)),
+                        BitOps::Modulo => {
+                            if right == 0 {
+                                Err(ExprError::Partial(PartialEvalError {
+                                    msg: "Modulo by zero is not allowed.".to_owned(),
+                                    fix: "Use a non-zero divisor.".to_owned(),
+                                    loc: self.op_span.to_owned(),
+                                }))
+                            } else {
+                                Ok(left.wrapping_rem(right))
+                            }
+                        }
+                        BitOps::Expo => {
+                            if right == 0 {
+                                Ok(1) // Any number to the power of 0 is 1
+                            } else {
+                                Ok(left.wrapping_pow(right as u32))
+                            }
+                        }
+                        _ => Err(ExprError::Partial(PartialEvalError {
+                            msg: format!("Unsupported bitwise operation: {}", self.op),
+                            fix: format!("{} {} 0x800", left, self.op),
+                            loc: self.op_span.to_owned(),
+                        })),
                     }
                 } else {
                     Err(ExprError::Partial(PartialEvalError {

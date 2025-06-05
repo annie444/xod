@@ -14,6 +14,20 @@ use nom::{
     sequence::{pair, separated_pair, terminated},
 };
 
+pub fn log_tag(input: Span) -> IResult<Span, Span> {
+    let (input, func) = tag("log").parse_complete(input)?;
+    Ok((input, func))
+}
+
+pub fn log_func(input: Span) -> IResult<Span, Funcs> {
+    let (input, (func, (right, left))) = (
+        terminated(log_tag, open_paren),
+        terminated(separated_pair(var_or_num, comma, var_or_num), close_paren),
+    )
+        .parse_complete(input)?;
+    Ok((input, Funcs::Log(func, right, left)))
+}
+
 pub fn bool_tag(input: Span) -> IResult<Span, Span> {
     let (input, func) = tag("bool").parse_complete(input)?;
     Ok((input, func))
@@ -135,6 +149,7 @@ pub fn funcs(input: Span) -> IResult<Span, Funcs> {
         quit_func,
         history_func,
         clear_func,
+        log_func,
         hex_func,
         oct_func,
         bin_func,
@@ -157,12 +172,42 @@ pub fn range_func(input: Span) -> IResult<Span, Range> {
 mod test {
     use crate::bitops::BitOps;
     use crate::parsers::ast::{
-        BitExpr, BoolFunc, Compare, CompareOp, Funcs, Number, SepBitExpr, VarNum,
+        BitExpr, BoolFunc, Compare, CompareOp, Funcs, Line, Number, SepBitExpr, VarNum,
     };
     use crate::parsers::general::lines;
+    use std::collections::VecDeque;
 
     use super::*;
 
+    #[test]
+    fn test_log_function() {
+        let line = r#"
+log(0x10, 2)
+"#;
+        let span = Span::new(line);
+        let result = lines(span);
+        unsafe {
+            assert_eq!(
+                result,
+                Ok((
+                    Span::new_from_raw_offset(14, 3, "", ()),
+                    VecDeque::from([Line::Func(Funcs::Log(
+                        Span::new_from_raw_offset(1, 2, "log", ()),
+                        VarNum::Num(Number::new(
+                            16,
+                            Span::new_from_raw_offset(7, 2, "10", ()),
+                            Some(Span::new_from_raw_offset(5, 2, "0x", ()))
+                        )),
+                        VarNum::Num(Number::new(
+                            2,
+                            Span::new_from_raw_offset(11, 2, "2", ()),
+                            None
+                        )),
+                    ))])
+                ))
+            )
+        }
+    }
     #[test]
     fn test_range() {
         let line = r#"

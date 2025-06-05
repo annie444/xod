@@ -654,6 +654,7 @@ pub enum Funcs<'a> {
     Bin(Span<'a>, VarNum<'a>),
     Oct(Span<'a>, VarNum<'a>),
     Dec(Span<'a>, VarNum<'a>),
+    Log(Span<'a>, VarNum<'a>, VarNum<'a>),
 }
 
 impl<'a> RefSpan<'a> for Funcs<'a> {
@@ -663,6 +664,7 @@ impl<'a> RefSpan<'a> for Funcs<'a> {
     {
         match self {
             Self::Bool(span, _)
+            | Self::Log(span, _, _)
             | Self::Quit(span)
             | Self::History(span)
             | Self::Clear(span)
@@ -687,6 +689,7 @@ impl fmt::Display for Funcs<'_> {
             Self::Help(_) => write!(f, "help()"),
             Self::History(_) => write!(f, "history()"),
             Self::Clear(_) => write!(f, "clear()"),
+            Self::Log(_, left, right) => write!(f, "log({}, {})", left, right),
         }
     }
 }

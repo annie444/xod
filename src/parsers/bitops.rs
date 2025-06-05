@@ -10,38 +10,72 @@ use nom::{
     sequence::terminated,
 };
 
-pub fn bit_or(input: Span) -> IResult<Span, (BitOps, Span)> {
+fn add(input: Span) -> IResult<Span, (BitOps, Span)> {
+    let (input, op) = tag("+").parse_complete(input)?;
+    Ok((input, (BitOps::Add, op)))
+}
+
+fn subtract(input: Span) -> IResult<Span, (BitOps, Span)> {
+    let (input, op) = tag("-").parse_complete(input)?;
+    Ok((input, (BitOps::Subtract, op)))
+}
+
+fn multiply(input: Span) -> IResult<Span, (BitOps, Span)> {
+    let (input, op) = tag("*").parse_complete(input)?;
+    Ok((input, (BitOps::Multiply, op)))
+}
+
+fn divide(input: Span) -> IResult<Span, (BitOps, Span)> {
+    let (input, op) = tag("/").parse_complete(input)?;
+    Ok((input, (BitOps::Divide, op)))
+}
+
+fn exponent(input: Span) -> IResult<Span, (BitOps, Span)> {
+    let (input, op) = tag("**").parse_complete(input)?;
+    Ok((input, (BitOps::Expo, op)))
+}
+
+fn modulo(input: Span) -> IResult<Span, (BitOps, Span)> {
+    let (input, op) = tag("%").parse_complete(input)?;
+    Ok((input, (BitOps::Modulo, op)))
+}
+
+fn bit_or(input: Span) -> IResult<Span, (BitOps, Span)> {
     let (input, op) = tag("|").parse_complete(input)?;
     Ok((input, (BitOps::Or, op)))
 }
 
-pub fn bit_xor(input: Span) -> IResult<Span, (BitOps, Span)> {
+fn bit_xor(input: Span) -> IResult<Span, (BitOps, Span)> {
     let (input, op) = tag("^").parse_complete(input)?;
     Ok((input, (BitOps::Xor, op)))
 }
 
-pub fn bit_and(input: Span) -> IResult<Span, (BitOps, Span)> {
+fn bit_and(input: Span) -> IResult<Span, (BitOps, Span)> {
     let (input, op) = tag("&").parse_complete(input)?;
     Ok((input, (BitOps::And, op)))
 }
 
-pub fn bit_not(input: Span) -> IResult<Span, (BitOps, Span)> {
+fn bit_not(input: Span) -> IResult<Span, (BitOps, Span)> {
     let (input, op) = alt((tag("!"), tag("~"))).parse_complete(input)?;
     Ok((input, (BitOps::Not, op)))
 }
 
-pub fn bit_left(input: Span) -> IResult<Span, (BitOps, Span)> {
+fn bit_left(input: Span) -> IResult<Span, (BitOps, Span)> {
     let (input, op) = tag("<<").parse_complete(input)?;
     Ok((input, (BitOps::LeftShift, op)))
 }
 
-pub fn bit_right(input: Span) -> IResult<Span, (BitOps, Span)> {
+fn bit_right(input: Span) -> IResult<Span, (BitOps, Span)> {
     let (input, op) = tag(">>").parse_complete(input)?;
     Ok((input, (BitOps::RightShift, op)))
 }
 
 pub fn dual_bit_ops(input: Span) -> IResult<Span, (BitOps, Span)> {
-    alt((bit_or, bit_xor, bit_and, bit_left, bit_right)).parse_complete(input)
+    alt((
+        bit_or, bit_xor, bit_and, bit_left, bit_right, add, subtract, modulo, exponent, divide,
+        multiply,
+    ))
+    .parse_complete(input)
 }
 
 pub fn dual_expr(input: Span) -> IResult<Span, BitExpr> {
@@ -101,6 +135,324 @@ mod test {
                     )
                 ))
             )
+        }
+    }
+
+    #[test]
+    fn test_add() {
+        unsafe {
+            assert_eq!(
+                add(Span::new("+ 8")),
+                Ok((
+                    Span::new_from_raw_offset(1, 1, " 8", ()),
+                    (BitOps::Add, Span::new_from_raw_offset(0, 1, "+", ()))
+                ))
+            );
+            assert_eq!(
+                dual_expr(Span::new("10 + 8 ")),
+                Ok((
+                    Span::new_from_raw_offset(6, 1, " ", ()),
+                    BitExpr::new(
+                        VarNum::Num(Number::new(
+                            10,
+                            Span::new_from_raw_offset(0, 1, "10", ()),
+                            None
+                        )),
+                        BitOps::Add,
+                        Span::new_from_raw_offset(3, 1, "+", ()),
+                        Some(VarNum::Num(Number::new(
+                            8,
+                            Span::new_from_raw_offset(5, 1, "8", ()),
+                            None
+                        )))
+                    )
+                ))
+            );
+            assert_eq!(
+                expr(Span::new("10 + 8 ")),
+                Ok((
+                    Span::new_from_raw_offset(6, 1, " ", ()),
+                    BitExpr::new(
+                        VarNum::Num(Number::new(
+                            10,
+                            Span::new_from_raw_offset(0, 1, "10", ()),
+                            None
+                        )),
+                        BitOps::Add,
+                        Span::new_from_raw_offset(3, 1, "+", ()),
+                        Some(VarNum::Num(Number::new(
+                            8,
+                            Span::new_from_raw_offset(5, 1, "8", ()),
+                            None
+                        )))
+                    )
+                ))
+            );
+        }
+    }
+
+    #[test]
+    fn test_subtract() {
+        unsafe {
+            assert_eq!(
+                subtract(Span::new("- 8")),
+                Ok((
+                    Span::new_from_raw_offset(1, 1, " 8", ()),
+                    (BitOps::Subtract, Span::new_from_raw_offset(0, 1, "-", ()))
+                ))
+            );
+            assert_eq!(
+                dual_expr(Span::new("10 - 8 ")),
+                Ok((
+                    Span::new_from_raw_offset(6, 1, " ", ()),
+                    BitExpr::new(
+                        VarNum::Num(Number::new(
+                            10,
+                            Span::new_from_raw_offset(0, 1, "10", ()),
+                            None
+                        )),
+                        BitOps::Subtract,
+                        Span::new_from_raw_offset(3, 1, "-", ()),
+                        Some(VarNum::Num(Number::new(
+                            8,
+                            Span::new_from_raw_offset(5, 1, "8", ()),
+                            None
+                        )))
+                    )
+                ))
+            );
+            assert_eq!(
+                expr(Span::new("10 - 8 ")),
+                Ok((
+                    Span::new_from_raw_offset(6, 1, " ", ()),
+                    BitExpr::new(
+                        VarNum::Num(Number::new(
+                            10,
+                            Span::new_from_raw_offset(0, 1, "10", ()),
+                            None
+                        )),
+                        BitOps::Subtract,
+                        Span::new_from_raw_offset(3, 1, "-", ()),
+                        Some(VarNum::Num(Number::new(
+                            8,
+                            Span::new_from_raw_offset(5, 1, "8", ()),
+                            None
+                        )))
+                    )
+                ))
+            );
+        }
+    }
+
+    #[test]
+    fn test_multiply() {
+        unsafe {
+            assert_eq!(
+                multiply(Span::new("* 8")),
+                Ok((
+                    Span::new_from_raw_offset(1, 1, " 8", ()),
+                    (BitOps::Multiply, Span::new_from_raw_offset(0, 1, "*", ()))
+                ))
+            );
+            assert_eq!(
+                dual_expr(Span::new("10 * 8 ")),
+                Ok((
+                    Span::new_from_raw_offset(6, 1, " ", ()),
+                    BitExpr::new(
+                        VarNum::Num(Number::new(
+                            10,
+                            Span::new_from_raw_offset(0, 1, "10", ()),
+                            None
+                        )),
+                        BitOps::Multiply,
+                        Span::new_from_raw_offset(3, 1, "*", ()),
+                        Some(VarNum::Num(Number::new(
+                            8,
+                            Span::new_from_raw_offset(5, 1, "8", ()),
+                            None
+                        )))
+                    )
+                ))
+            );
+            assert_eq!(
+                expr(Span::new("10 * 8 ")),
+                Ok((
+                    Span::new_from_raw_offset(6, 1, " ", ()),
+                    BitExpr::new(
+                        VarNum::Num(Number::new(
+                            10,
+                            Span::new_from_raw_offset(0, 1, "10", ()),
+                            None
+                        )),
+                        BitOps::Multiply,
+                        Span::new_from_raw_offset(3, 1, "*", ()),
+                        Some(VarNum::Num(Number::new(
+                            8,
+                            Span::new_from_raw_offset(5, 1, "8", ()),
+                            None
+                        )))
+                    )
+                ))
+            );
+        }
+    }
+
+    #[test]
+    fn test_divide() {
+        unsafe {
+            assert_eq!(
+                divide(Span::new("/ 8")),
+                Ok((
+                    Span::new_from_raw_offset(1, 1, " 8", ()),
+                    (BitOps::Divide, Span::new_from_raw_offset(0, 1, "/", ()))
+                ))
+            );
+            assert_eq!(
+                dual_expr(Span::new("10 / 8 ")),
+                Ok((
+                    Span::new_from_raw_offset(6, 1, " ", ()),
+                    BitExpr::new(
+                        VarNum::Num(Number::new(
+                            10,
+                            Span::new_from_raw_offset(0, 1, "10", ()),
+                            None
+                        )),
+                        BitOps::Divide,
+                        Span::new_from_raw_offset(3, 1, "/", ()),
+                        Some(VarNum::Num(Number::new(
+                            8,
+                            Span::new_from_raw_offset(5, 1, "8", ()),
+                            None
+                        )))
+                    )
+                ))
+            );
+            assert_eq!(
+                expr(Span::new("10 / 8 ")),
+                Ok((
+                    Span::new_from_raw_offset(6, 1, " ", ()),
+                    BitExpr::new(
+                        VarNum::Num(Number::new(
+                            10,
+                            Span::new_from_raw_offset(0, 1, "10", ()),
+                            None
+                        )),
+                        BitOps::Divide,
+                        Span::new_from_raw_offset(3, 1, "/", ()),
+                        Some(VarNum::Num(Number::new(
+                            8,
+                            Span::new_from_raw_offset(5, 1, "8", ()),
+                            None
+                        )))
+                    )
+                ))
+            );
+        }
+    }
+
+    #[test]
+    fn test_modulo() {
+        unsafe {
+            assert_eq!(
+                modulo(Span::new("% 8")),
+                Ok((
+                    Span::new_from_raw_offset(1, 1, " 8", ()),
+                    (BitOps::Modulo, Span::new_from_raw_offset(0, 1, "%", ()))
+                ))
+            );
+            assert_eq!(
+                dual_expr(Span::new("10 % 8 ")),
+                Ok((
+                    Span::new_from_raw_offset(6, 1, " ", ()),
+                    BitExpr::new(
+                        VarNum::Num(Number::new(
+                            10,
+                            Span::new_from_raw_offset(0, 1, "10", ()),
+                            None
+                        )),
+                        BitOps::Modulo,
+                        Span::new_from_raw_offset(3, 1, "%", ()),
+                        Some(VarNum::Num(Number::new(
+                            8,
+                            Span::new_from_raw_offset(5, 1, "8", ()),
+                            None
+                        )))
+                    )
+                ))
+            );
+            assert_eq!(
+                expr(Span::new("10 % 8 ")),
+                Ok((
+                    Span::new_from_raw_offset(6, 1, " ", ()),
+                    BitExpr::new(
+                        VarNum::Num(Number::new(
+                            10,
+                            Span::new_from_raw_offset(0, 1, "10", ()),
+                            None
+                        )),
+                        BitOps::Modulo,
+                        Span::new_from_raw_offset(3, 1, "%", ()),
+                        Some(VarNum::Num(Number::new(
+                            8,
+                            Span::new_from_raw_offset(5, 1, "8", ()),
+                            None
+                        )))
+                    )
+                ))
+            );
+        }
+    }
+
+    #[test]
+    fn test_exponent() {
+        unsafe {
+            assert_eq!(
+                exponent(Span::new("** 8")),
+                Ok((
+                    Span::new_from_raw_offset(2, 1, " 8", ()),
+                    (BitOps::Expo, Span::new_from_raw_offset(0, 1, "**", ()))
+                ))
+            );
+            assert_eq!(
+                dual_expr(Span::new("10 ** 8 ")),
+                Ok((
+                    Span::new_from_raw_offset(7, 1, " ", ()),
+                    BitExpr::new(
+                        VarNum::Num(Number::new(
+                            10,
+                            Span::new_from_raw_offset(0, 1, "10", ()),
+                            None
+                        )),
+                        BitOps::Expo,
+                        Span::new_from_raw_offset(3, 1, "**", ()),
+                        Some(VarNum::Num(Number::new(
+                            8,
+                            Span::new_from_raw_offset(6, 1, "8", ()),
+                            None
+                        )))
+                    )
+                ))
+            );
+            assert_eq!(
+                expr(Span::new("10 ** 8 ")),
+                Ok((
+                    Span::new_from_raw_offset(7, 1, " ", ()),
+                    BitExpr::new(
+                        VarNum::Num(Number::new(
+                            10,
+                            Span::new_from_raw_offset(0, 1, "10", ()),
+                            None
+                        )),
+                        BitOps::Expo,
+                        Span::new_from_raw_offset(3, 1, "**", ()),
+                        Some(VarNum::Num(Number::new(
+                            8,
+                            Span::new_from_raw_offset(6, 1, "8", ()),
+                            None
+                        )))
+                    )
+                ))
+            );
         }
     }
 

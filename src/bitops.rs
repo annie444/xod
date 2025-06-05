@@ -10,6 +10,12 @@ pub enum BitOps {
     LeftShift,
     RightShift,
     Not,
+    Add,
+    Subtract,
+    Divide,
+    Multiply,
+    Modulo,
+    Expo,
 }
 
 impl fmt::Display for BitOps {
@@ -21,6 +27,12 @@ impl fmt::Display for BitOps {
             Self::LeftShift => write!(f, "<<"),
             Self::RightShift => write!(f, ">>"),
             Self::Not => write!(f, "~ or !"),
+            Self::Add => write!(f, "+"),
+            Self::Subtract => write!(f, "-"),
+            Self::Divide => write!(f, "/"),
+            Self::Multiply => write!(f, "*"),
+            Self::Modulo => write!(f, "%"),
+            Self::Expo => write!(f, "**"),
         }
     }
 }

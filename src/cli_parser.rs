@@ -35,13 +35,19 @@ impl TypedValueParser for BitOpsParser {
     ) -> Result<Self::Value, clap::Error> {
         let str_parser = StringValueParser::new();
         let val = str_parser.parse_ref(cmd, arg, value)?;
-        match val.as_str() {
-            "&" => Ok(BitOps::And),
-            "|" => Ok(BitOps::Or),
-            "^" => Ok(BitOps::Xor),
-            "<<" => Ok(BitOps::LeftShift),
-            ">>" => Ok(BitOps::RightShift),
-            "!" | "~" => Ok(BitOps::Not),
+        match val.to_ascii_lowercase().as_str() {
+            "&" | "and" => Ok(BitOps::And),
+            "|" | "or" => Ok(BitOps::Or),
+            "^" | "xor" => Ok(BitOps::Xor),
+            "<<" | "left" => Ok(BitOps::LeftShift),
+            ">>" | "right" => Ok(BitOps::RightShift),
+            "!" | "~" | "not" => Ok(BitOps::Not),
+            "+" | "plus" | "add" => Ok(BitOps::Add),
+            "-" | "minus" | "sub" | "subtract" => Ok(BitOps::Subtract),
+            "*" | "x" | "times" | "mul" | "multiply" => Ok(BitOps::Multiply),
+            "/" | "div" | "divide" => Ok(BitOps::Divide),
+            "%" | "mod" | "modulo" => Ok(BitOps::Modulo),
+            "**" | "pow" | "power" | "expo" | "exponent" => Ok(BitOps::Expo),
             _ => {
                 let mut error = clap::Error::raw(
                     ErrorKind::InvalidValue,
