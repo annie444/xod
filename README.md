@@ -1,6 +1,6 @@
 # Xod 🧮
 
-[![CI](https://github.com/annie444/xod/actions/workflows/ci.yaml/badge.svg)](https://github.com/annie444/xod/actions/workflows/ci.yaml)
+[![Crates.io](https://img.shields.io/crates/v/xod.svg)](https://crates.io/crates/xod) [![CI](https://github.com/annie444/xod/actions/workflows/ci.yaml/badge.svg)](https://github.com/annie444/xod/actions/workflows/ci.yaml)
 
 A tiny REPL for bitwise arithmetic and expression evaluation.
 
