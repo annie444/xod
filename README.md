@@ -6,22 +6,22 @@ Xod is a minimal scripting language and interactive REPL designed for experiment
 
 ## ✨ Features
 
-    •	Evaluate bitwise and arithmetic expressions interactively.
-    •	Integer-only logic with no floating point or negative values.
-    •	Support for basic list manipulation and iteration.
-    •	Familiar control flow with if, while, and for blocks.
-    •	Hex, octal, binary, and decimal formatting.
-    •	Simple built-in commands like help(), clear(), and history().
+- Evaluate bitwise and arithmetic expressions interactively.
+- Integer-only logic with no floating point or negative values.
+- Support for basic list manipulation and iteration.
+- Familiar control flow with if, while, and for blocks.
+- Hex, octal, binary, and decimal formatting.
+- Simple built-in commands like help(), clear(), and history().
 
 ## 🧠 Language Overview
 
 ### Xod supports:
 
-    •	Operators: &, |, ^, ~, <<, >>, +, -, *, /, %, **
-    •	Booleans: ==, !=, <, <=, >, >=
-    •	List Methods: append, prepend, front, back, index
-    •	Builtin Commands: hex(), bin(), log(base, value), range(start, end), etc.
-    •	Control Flow:
+- Operators: &, |, ^, ~, <<, >>, +, -, \*, /, %, \*\*
+- Booleans: ==, !=, <, <=, >, >=
+- List Methods: append, prepend, front, back, index
+- Builtin Commands: hex(), bin(), log(base, value), range(start, end), etc.
+- Control Flow:
 
 ```c
 for(x in range(1, 5)) { bin(x) }
@@ -62,12 +62,12 @@ Then type any expression:
 0b11
 ```
 
-## 🧰 Commands
+## 🧰 Basic commands
 
-    •	`help()` – Show help message
-    •	`history()` – Show input history
-    •	`clear()` – Clear the screen
-    •	`quit()` – Exit the REPL
+- `help()` – Show help message
+- `history()` – Show input history
+- `clear()` – Clear the screen
+- `quit()` – Exit the REPL
 
 ## 📦 Installation
 
