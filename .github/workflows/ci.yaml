@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    name: Lint and Format
+    runs-on: ubuntu-latest
+    permissions:
+      attestations: write
+      checks: write
+      contents: read
+      issues: write
+      pull-requests: write
+      security-events: write
+      statuses: write
+    strategy:
+      matrix:
+        toolchain:
+          - stable
+          - nightly
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: "${{ matrix.toolchain }}"
+          components: clippy
+      - uses: actions-rs/clippy-check@v1
+        with:
+          args: "--all-targets"
+          name: "clippy-check-${{ matrix.toolchain }}"
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  tests:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          components: clippy
+      - run: "cargo test --all-targets -vv"
+
+  build:
+    name: Build features
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        toolchain:
+          - stable
+          - nightly
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: "${{ matrix.toolchain }}"
+          components: clippy
+      - name: Build features
+        run: cargo build -vv
