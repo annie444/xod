@@ -1,5 +1,7 @@
 # Xod 🧮
 
+[![CI](https://github.com/annie444/xod/actions/workflows/ci.yaml/badge.svg)](https://github.com/annie444/xod/actions/workflows/ci.yaml)
+
 A tiny REPL for bitwise arithmetic and expression evaluation.
 
 Xod is a minimal scripting language and interactive REPL designed for experimenting with bitwise logic and integer math. Think of it as a scratchpad for systems engineers, embedded developers, and anyone who needs to test bitwise operations in a focused, rule-consistent environment.
@@ -11,7 +13,7 @@ Xod is a minimal scripting language and interactive REPL designed for experiment
 - Support for basic list manipulation and iteration.
 - Familiar control flow with if, while, and for blocks.
 - Hex, octal, binary, and decimal formatting.
-- Simple built-in commands like help(), clear(), and history().
+- Simple built-in commands like `help()`, `clear()`, and `history()`.
 
 ## 🧠 Language Overview
 
@@ -20,7 +22,7 @@ Xod is a minimal scripting language and interactive REPL designed for experiment
 - Operators: `&`, `|`, `^`, `~`, `<<`, `>>`, `+`, `-`, `*`, `/`, `%`, `**`
 - Booleans: `==`, `!=`, `<`, `<=`, `>`, `>=`
 - List Methods: `append`, `prepend`, `front`, `back`, `index`
-- Builtin Commands: `hex()`, `bin()`, `log(base`, `value)`, `range(start`, `end)`, etc.
+- Builtin Commands: `hex()`, `bin()`, `log(base`, `value)`, `range(start, end)`, etc.
 - Control Flow:
 
 ```c
