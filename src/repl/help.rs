@@ -55,7 +55,7 @@ pub fn print_help() {
     commands.printstd();
     cprintln!(
         r#"
-<s><y!>Bitwise operators:</></>
+<s><y!>Basic operators:</></>
 "#
     );
     bit_operators.printstd();
@@ -82,6 +82,10 @@ pub fn print_help() {
 <s><r!>Note:</></>
 
     There is not an agreed upon standard for the order of operations in bitwise expressions. To avoid ambiguity, it is required to use parentheses to group chained expressions. For example, instead of writing `a & b | c`, you should write `(a & b) | c` or `a & (b | c)` to clarify the order of operations.
+
+    Because this was designed for bitwise expressions, floating point and negative numbers are not supported. The REPL will return an error if you try to use them.
+
+    This REPL is designed to be a simple and interactive way to evaluate bitwise expressions. It is not a full programming language, but rather a tool for evaluating expressions in a specific domain. If you have any questions or suggestions, please feel free to reach out.
 
 "#
     );
@@ -299,6 +303,42 @@ fn bitwise_operators_table(table_format: TableFormat) -> Table {
                 .with_style(Attr::ForegroundColor(color::BRIGHT_GREEN)),
             Cell::new_align("Bitwise right shift operator.", Alignment::LEFT),
         ]),
+        Row::new(vec![
+            Cell::new_align("+", Alignment::CENTER)
+                .with_style(Attr::Bold)
+                .with_style(Attr::ForegroundColor(color::BRIGHT_GREEN)),
+            Cell::new_align("Addition.", Alignment::LEFT),
+        ]),
+        Row::new(vec![
+            Cell::new_align("-", Alignment::CENTER)
+                .with_style(Attr::Bold)
+                .with_style(Attr::ForegroundColor(color::BRIGHT_GREEN)),
+            Cell::new_align("Subtraction.", Alignment::LEFT),
+        ]),
+        Row::new(vec![
+            Cell::new_align("*", Alignment::CENTER)
+                .with_style(Attr::Bold)
+                .with_style(Attr::ForegroundColor(color::BRIGHT_GREEN)),
+            Cell::new_align("Multiplication.", Alignment::LEFT),
+        ]),
+        Row::new(vec![
+            Cell::new_align("/", Alignment::CENTER)
+                .with_style(Attr::Bold)
+                .with_style(Attr::ForegroundColor(color::BRIGHT_GREEN)),
+            Cell::new_align("Division.", Alignment::LEFT),
+        ]),
+        Row::new(vec![
+            Cell::new_align("%", Alignment::CENTER)
+                .with_style(Attr::Bold)
+                .with_style(Attr::ForegroundColor(color::BRIGHT_GREEN)),
+            Cell::new_align("Modulo (remainder).", Alignment::LEFT),
+        ]),
+        Row::new(vec![
+            Cell::new_align("**", Alignment::CENTER)
+                .with_style(Attr::Bold)
+                .with_style(Attr::ForegroundColor(color::BRIGHT_GREEN)),
+            Cell::new_align("Exponent/Power.", Alignment::LEFT),
+        ]),
     ]);
     operators
 }
@@ -366,6 +406,19 @@ fn commands_table(table_format: TableFormat) -> Table {
             ),
             Cell::new_align(
                 "Returns a non-inclusive iterator over the range.",
+                Alignment::LEFT,
+            ),
+        ]),
+        Row::new(vec![
+            Cell::new_align("log(<value>, <value>)", Alignment::CENTER)
+                .with_style(Attr::Bold)
+                .with_style(Attr::ForegroundColor(color::BRIGHT_GREEN)),
+            Cell::new_align(
+                "Two values of either a variable or a number",
+                Alignment::LEFT,
+            ),
+            Cell::new_align(
+                "Returns a floored integer representation of the log.\nThe left value is the base, and the right value is the number to log.",
                 Alignment::LEFT,
             ),
         ]),
