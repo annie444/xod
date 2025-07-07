@@ -65,12 +65,11 @@ fn print_nums(args: HexOctBin) {
                 .error(
                     ErrorKind::InvalidValue,
                     format!(
-                        r#"Cannot use operator {} without another number.
+                        r#"Cannot use operator {op} without another number.
 
 Example:
-    {} {} 0xff
+    {number} {op} 0xff
                 "#,
-                        op, number, op
                     ),
                 )
                 .exit(),

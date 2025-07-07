@@ -18,7 +18,7 @@ pub enum NumOrList {
 impl fmt::Display for NumOrList {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            NumOrList::Num(n) => write!(f, "{}", n),
+            NumOrList::Num(n) => write!(f, "{n}"),
             NumOrList::List(list) => write!(
                 f,
                 "[{}]",
@@ -41,7 +41,7 @@ pub enum NumOrListNoOp {
 impl fmt::Display for NumOrListNoOp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            NumOrListNoOp::Num(n) => write!(f, "{}", n),
+            NumOrListNoOp::Num(n) => write!(f, "{n}"),
             NumOrListNoOp::List(list) => write!(
                 f,
                 "[{}]",
@@ -126,7 +126,7 @@ fn get_list(
             (Some(msg), None) => Err(ExprError::Partial(PartialEvalError {
                 loc: var.to_owned(),
                 msg,
-                fix: format!("Try wrapping the number in brackets `[{}]`", var),
+                fix: format!("Try wrapping the number in brackets `[{var}]`"),
             })),
             (None, Some(fix)) => Err(ExprError::Partial(PartialEvalError {
                 loc: var.to_owned(),
@@ -136,7 +136,7 @@ fn get_list(
             (None, None) => Err(ExprError::Partial(PartialEvalError {
                 loc: var.to_owned(),
                 msg: "Expected a list, but got a number.".to_owned(),
-                fix: format!("Try wrapping the number in brackets `[{}]`", var),
+                fix: format!("Try wrapping the number in brackets `[{var}]`"),
             })),
         },
     }
@@ -267,13 +267,13 @@ impl<'b, 'a: 'b> Expression<'a, 'b, std::ops::Range<usize>> for Range<'a> {
             std::cmp::Ordering::Greater => Err(PartialEvalError {
                 loc: start_span,
                 msg: "Start of range is greater than end.".to_owned(),
-                fix: format!("{}..{}", end, start),
+                fix: format!("{end}..{start}"),
             }
             .into()),
             std::cmp::Ordering::Equal => Err(PartialEvalError {
                 loc: start_span,
                 msg: "Start of range is equal to end.".to_owned(),
-                fix: format!("{}..{}", start, start + 1),
+                fix: format!("{start}..{}", start + 1),
             }
             .into()),
             _ => Ok(start..end),
@@ -585,7 +585,7 @@ impl<'b, 'a: 'b> Expression<'a, 'b, NumOrList> for Funcs<'a> {
                 let var = var.eval()?;
                 match var {
                     NumOrList::Num(num) => {
-                        println!("{}", num);
+                        println!("{num}");
                         Ok(NumOrList::Num(num))
                     }
                     NumOrList::List(list) => {
@@ -593,13 +593,13 @@ impl<'b, 'a: 'b> Expression<'a, 'b, NumOrList> for Funcs<'a> {
                         let mut p = "[".to_string();
                         for (i, num) in list.iter().enumerate() {
                             if i < len {
-                                p.push_str(&format!("{}, ", num));
+                                p.push_str(&format!("{num}, "));
                             } else {
-                                p.push_str(&format!("{}", num));
+                                p.push_str(&format!("{num}"));
                             }
                         }
                         p.push(']');
-                        println!("{}", p);
+                        println!("{p}");
                         Ok(NumOrList::List(list))
                     }
                 }
@@ -608,7 +608,7 @@ impl<'b, 'a: 'b> Expression<'a, 'b, NumOrList> for Funcs<'a> {
                 let var = var.eval()?;
                 match var {
                     NumOrList::Num(num) => {
-                        println!("0x{:x}", num);
+                        println!("0x{num:x}");
                         Ok(NumOrList::Num(num))
                     }
                     NumOrList::List(list) => {
@@ -616,13 +616,13 @@ impl<'b, 'a: 'b> Expression<'a, 'b, NumOrList> for Funcs<'a> {
                         let mut p = "[".to_string();
                         for (i, num) in list.iter().enumerate() {
                             if i < len {
-                                p.push_str(&format!("0x{:x}, ", num));
+                                p.push_str(&format!("0x{num:x}, "));
                             } else {
-                                p.push_str(&format!("0x{:x}", num));
+                                p.push_str(&format!("0x{num:x}"));
                             }
                         }
                         p.push(']');
-                        println!("{}", p);
+                        println!("{p}");
                         Ok(NumOrList::List(list))
                     }
                 }
@@ -631,7 +631,7 @@ impl<'b, 'a: 'b> Expression<'a, 'b, NumOrList> for Funcs<'a> {
                 let var = var.eval()?;
                 match var {
                     NumOrList::Num(num) => {
-                        println!("0o{:o}", num);
+                        println!("0o{num:o}");
                         Ok(NumOrList::Num(num))
                     }
                     NumOrList::List(list) => {
@@ -639,13 +639,13 @@ impl<'b, 'a: 'b> Expression<'a, 'b, NumOrList> for Funcs<'a> {
                         let mut p = "[".to_string();
                         for (i, num) in list.iter().enumerate() {
                             if i < len {
-                                p.push_str(&format!("0o{:o}, ", num));
+                                p.push_str(&format!("0o{num:o}, "));
                             } else {
-                                p.push_str(&format!("0o{:o}", num));
+                                p.push_str(&format!("0o{num:o}"));
                             }
                         }
                         p.push(']');
-                        println!("{}", p);
+                        println!("{p}");
                         Ok(NumOrList::List(list))
                     }
                 }
@@ -654,7 +654,7 @@ impl<'b, 'a: 'b> Expression<'a, 'b, NumOrList> for Funcs<'a> {
                 let var = var.eval()?;
                 match var {
                     NumOrList::Num(num) => {
-                        println!("0b{:b}", num);
+                        println!("0b{num:b}");
                         Ok(NumOrList::Num(num))
                     }
                     NumOrList::List(list) => {
@@ -662,13 +662,13 @@ impl<'b, 'a: 'b> Expression<'a, 'b, NumOrList> for Funcs<'a> {
                         let mut p = "[".to_string();
                         for (i, num) in list.iter().enumerate() {
                             if i < len {
-                                p.push_str(&format!("0b{:b}, ", num));
+                                p.push_str(&format!("0b{num:b}, "));
                             } else {
-                                p.push_str(&format!("0b{:b}", num));
+                                p.push_str(&format!("0b{num:b}"));
                             }
                         }
                         p.push(']');
-                        println!("{}", p);
+                        println!("{p}");
                         Ok(NumOrList::List(list))
                     }
                 }
@@ -753,14 +753,14 @@ impl<'b, 'a: 'b> Expression<'a, 'b, usize> for BitExpr<'a> {
                         }
                         _ => Err(ExprError::Partial(PartialEvalError {
                             msg: format!("Unsupported bitwise operation: {}", self.op),
-                            fix: format!("{} {} 0x800", left, self.op),
+                            fix: format!("{left} {} 0x800", self.op),
                             loc: self.op_span.to_owned(),
                         })),
                     }
                 } else {
                     Err(ExprError::Partial(PartialEvalError {
                         msg: format!("Missing right operand for bitwise operation: {}", self.op),
-                        fix: format!("{} {} 0x800", left, self.op),
+                        fix: format!("{left} {} 0x800", self.op),
                         loc: self.op_span.to_owned(),
                     }))
                 }

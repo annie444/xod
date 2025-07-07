@@ -170,7 +170,7 @@ pub fn run() {
                 break;
             }
             Err(err) => {
-                println!("Error reading line: {:?}", err);
+                println!("Error reading line: {err:?}");
                 rl.history_mut()
                     .save(history_file)
                     .expect("Failed to save history file");
@@ -195,10 +195,10 @@ fn print_history(rl: &Editor<XodHelper, FileHistory>) {
         let i = len - i;
         let mut entry = entry
             .split('\n')
-            .map(|s| format!("      {}\n", s))
+            .map(|s| format!("      {s}\n"))
             .collect::<String>();
         entry.replace_range(0..=4, &cformat!("<s><b>{i: >3}</></> :"));
-        println!("{}", entry);
+        println!("{entry}");
     }
 }
 
@@ -207,7 +207,7 @@ fn parse_lines<'a>(parsed_lines: &'a mut VecDeque<Line>) -> XodCmd<'a> {
         match parsed_line.eval() {
             Ok(result) => match result {
                 NumOrListNoOp::Num(n) => print_num("", n),
-                NumOrListNoOp::List(l) => println!("{:?}", l),
+                NumOrListNoOp::List(l) => println!("{l:?}"),
                 NumOrListNoOp::NoOp => {}
             },
             Err(e) => match e {

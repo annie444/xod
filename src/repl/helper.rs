@@ -323,7 +323,7 @@ fn validate_function(src: &str) -> ValidationResult {
 }
 
 fn validate_parse(src: &str) -> ValidationResult {
-    let input_str = format!("{}\n", src);
+    let input_str = format!("{src}\n");
     let input = Span::new(&input_str);
     match lines(input) {
         Ok((_, _)) => ValidationResult::Valid(None),

@@ -52,7 +52,7 @@ impl TypedValueParser for BitOpsParser {
                 let mut error = clap::Error::raw(
                     ErrorKind::InvalidValue,
                     format!(
-                        r#"{} is not a valid binary operator.
+                        r#"{val} is not a valid binary operator.
 Valid operators are:
 
     Bitwise AND : &
@@ -61,8 +61,7 @@ Valid operators are:
     Bitwise NOT : ! or ~
     Left shift  : <<
     Right shift : >>
-                "#,
-                        val
+                "#
                     ),
                 );
                 error = error.with_cmd(cmd);
@@ -112,7 +111,7 @@ impl TypedValueParser for NumberParser {
             };
             let mut error = clap::Error::raw(
                 ErrorKind::InvalidValue,
-                format!("Unable to parse number, got error: {}", kind),
+                format!("Unable to parse number, got error: {kind}"),
             );
             error = error.with_cmd(cmd);
             let _ = error.insert(

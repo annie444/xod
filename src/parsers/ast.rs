@@ -49,11 +49,11 @@ impl<'a> RefSpan<'a> for Method<'a> {
 impl fmt::Display for Method<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Append(var, _, num) => write!(f, "{}.append({})", var.fragment(), num),
-            Self::Prepend(var, _, num) => write!(f, "{}.prepend({})", var.fragment(), num),
+            Self::Append(var, _, num) => write!(f, "{}.append({num})", var.fragment()),
+            Self::Prepend(var, _, num) => write!(f, "{}.prepend({num})", var.fragment()),
             Self::Front(var, _) => write!(f, "{}.front()", var.fragment()),
             Self::Back(var, _) => write!(f, "{}.back()", var.fragment()),
-            Self::Index(var, _, num) => write!(f, "{}.index({})", var, num),
+            Self::Index(var, _, num) => write!(f, "{var}.index({num})"),
         }
     }
 }
@@ -169,14 +169,14 @@ impl fmt::Display for Iter<'_> {
                 write!(f, "[")?;
                 let len = l.len();
                 for (i, j) in l.iter().enumerate() {
-                    write!(f, "{}", j)?;
+                    write!(f, "{j}")?;
                     if i < len - 1 {
                         write!(f, ", ")?;
                     }
                 }
                 write!(f, "]")
             }
-            Self::Range(r) => write!(f, "{}", r),
+            Self::Range(r) => write!(f, "{r}"),
             Self::Var(v) => write!(f, "{}", v.fragment()),
         }
     }
@@ -221,7 +221,7 @@ impl fmt::Display for Loop<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.kind)?;
         for line in &self.body {
-            write!(f, "    {}", line)?;
+            write!(f, "    {line}")?;
         }
         writeln!(f, "}}")
     }
@@ -294,9 +294,9 @@ impl<'a> RefSpan<'a> for Loops<'a> {
 impl fmt::Display for Loops<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::For(_, span, iter) => writeln!(f, "for ({} in {}) {{", span.fragment(), iter),
-            Self::While(_, cond) => writeln!(f, "while ({}) {{", cond),
-            Self::If(_, cond) => writeln!(f, "if ({}) {{", cond),
+            Self::For(_, span, iter) => writeln!(f, "for ({} in {iter}) {{", span.fragment()),
+            Self::While(_, cond) => writeln!(f, "while ({cond}) {{"),
+            Self::If(_, cond) => writeln!(f, "if ({cond}) {{"),
         }
     }
 }
@@ -362,18 +362,18 @@ impl fmt::Display for VarOrVal<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Var(v) => write!(f, "{}", v.fragment()),
-            Self::Num(x) => write!(f, "{}", x),
+            Self::Num(x) => write!(f, "{x}"),
             Self::Expr(x) => {
-                write!(f, "{}", x)
+                write!(f, "{x}")
             }
             Self::Method(m) => {
-                write!(f, "{}", m)
+                write!(f, "{m}")
             }
             Self::List(l) => {
                 write!(f, "[")?;
                 let len = l.len();
                 for (i, j) in l.iter().enumerate() {
-                    write!(f, "{}", j)?;
+                    write!(f, "{j}")?;
                     if i < len - 1 {
                         write!(f, ", ")?;
                     }
@@ -381,13 +381,13 @@ impl fmt::Display for VarOrVal<'_> {
                 write!(f, "]")
             }
             Self::Range(r) => {
-                write!(f, "{}", r)
+                write!(f, "{r}")
             }
             Self::Func(u) => {
-                write!(f, "{}", u)
+                write!(f, "{u}")
             }
             Self::SepExpr(se) => {
-                write!(f, "{}", se)
+                write!(f, "{se}")
             }
         }
     }
@@ -477,12 +477,12 @@ impl fmt::Display for VarNum<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Var(v) => write!(f, "{}", v.fragment()),
-            Self::Num(x) => write!(f, "{}", x),
+            Self::Num(x) => write!(f, "{x}"),
             Self::Expr(x) => {
-                write!(f, "{}", x)
+                write!(f, "{x}")
             }
-            Self::Func(u) => write!(f, "{}", u),
-            Self::Method(m) => write!(f, "{}", m),
+            Self::Func(u) => write!(f, "{u}"),
+            Self::Method(m) => write!(f, "{m}"),
         }
     }
 }
@@ -597,12 +597,12 @@ impl fmt::Display for Line<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Empty => writeln!(f),
-            Self::Variable(v) => writeln!(f, "{}", v),
-            Self::Expr(e) => writeln!(f, "{}", e),
-            Self::Comp(c) => writeln!(f, "{}", c),
-            Self::Func(u) => writeln!(f, "{}", u),
-            Self::Loop(l) => writeln!(f, "{}", l),
-            Self::Method(m) => writeln!(f, "{}", m),
+            Self::Variable(v) => writeln!(f, "{v}"),
+            Self::Expr(e) => writeln!(f, "{e}"),
+            Self::Comp(c) => writeln!(f, "{c}"),
+            Self::Func(u) => writeln!(f, "{u}"),
+            Self::Loop(l) => writeln!(f, "{l}"),
+            Self::Method(m) => writeln!(f, "{m}"),
         }
     }
 }
@@ -680,16 +680,16 @@ impl<'a> RefSpan<'a> for Funcs<'a> {
 impl fmt::Display for Funcs<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Bool(_, i) => write!(f, "bool({})", i),
+            Self::Bool(_, i) => write!(f, "bool({i})"),
             Self::Quit(_) => write!(f, "quit()"),
-            Self::Hex(_, v) => write!(f, "hex({})", v),
-            Self::Bin(_, v) => write!(f, "bin({})", v),
-            Self::Oct(_, v) => write!(f, "oct({})", v),
-            Self::Dec(_, v) => write!(f, "dec({})", v),
+            Self::Hex(_, v) => write!(f, "hex({v})"),
+            Self::Bin(_, v) => write!(f, "bin({v})"),
+            Self::Oct(_, v) => write!(f, "oct({v})"),
+            Self::Dec(_, v) => write!(f, "dec({v})"),
             Self::Help(_) => write!(f, "help()"),
             Self::History(_) => write!(f, "history()"),
             Self::Clear(_) => write!(f, "clear()"),
-            Self::Log(_, left, right) => write!(f, "log({}, {})", left, right),
+            Self::Log(_, left, right) => write!(f, "log({left}, {right})"),
         }
     }
 }
@@ -721,8 +721,8 @@ impl<'a> RefSpan<'a> for BoolFunc<'a> {
 impl fmt::Display for BoolFunc<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Compare(c) => write!(f, "{}", c),
-            Self::VarNum(v) => write!(f, "{}", v),
+            Self::Compare(c) => write!(f, "{c}"),
+            Self::VarNum(v) => write!(f, "{v}"),
         }
     }
 }
@@ -827,7 +827,7 @@ impl<'a> BitExpr<'a> {
 impl std::fmt::Display for BitExpr<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(right) = &self.right {
-            write!(f, "{} {} {}", self.left, self.op, right)
+            write!(f, "{} {} {right}", self.left, self.op)
         } else {
             write!(f, "{} {}", self.op, self.left)
         }
