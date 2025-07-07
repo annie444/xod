@@ -335,10 +335,10 @@ impl Iterator for IntoIter<'_> {
         } else {
             None
         };
-        if let Some(var) = &self.var {
-            if let Some(value) = val {
-                set_var(*var, NumOrList::Num(value)).ok()?;
-            }
+        if let Some(var) = &self.var
+            && let Some(value) = val
+        {
+            set_var(*var, NumOrList::Num(value)).ok()?;
         }
         val
     }

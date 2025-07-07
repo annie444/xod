@@ -78,20 +78,20 @@ fn balanced(line: &str) -> Vec<Delimiters> {
             brace_stack -= 1;
         }
     }
-    if paren_stack != 0 {
-        if let Some(last_paren) = last_open_paren {
-            order.push(Delimiters::Paren(last_paren));
-        }
+    if paren_stack != 0
+        && let Some(last_paren) = last_open_paren
+    {
+        order.push(Delimiters::Paren(last_paren));
     }
-    if bracket_stack != 0 {
-        if let Some(last_bracket) = last_open_bracket {
-            order.push(Delimiters::Bracket(last_bracket));
-        }
+    if bracket_stack != 0
+        && let Some(last_bracket) = last_open_bracket
+    {
+        order.push(Delimiters::Bracket(last_bracket));
     }
-    if brace_stack != 0 {
-        if let Some(last_brace) = last_open_brace {
-            order.push(Delimiters::Brace(last_brace));
-        }
+    if brace_stack != 0
+        && let Some(last_brace) = last_open_brace
+    {
+        order.push(Delimiters::Brace(last_brace));
     }
     order.sort();
     order
@@ -149,12 +149,12 @@ impl Highlighter for XodHelper {
             return Cow::Borrowed(line);
         }
         // highlight matching brace/bracket/parenthesis if it exists
-        if let Some((bracket, pos)) = self.bracket.get() {
-            if let Some((matching, idx)) = find_matching_bracket(line, pos, bracket) {
-                let mut copy = line.to_owned();
-                copy.replace_range(idx..=idx, &cformat!("<s><g>{}</></>", matching as char));
-                return Cow::Owned(copy);
-            }
+        if let Some((bracket, pos)) = self.bracket.get()
+            && let Some((matching, idx)) = find_matching_bracket(line, pos, bracket)
+        {
+            let mut copy = line.to_owned();
+            copy.replace_range(idx..=idx, &cformat!("<s><g>{}</></>", matching as char));
+            return Cow::Owned(copy);
         }
         Cow::Borrowed(line)
     }

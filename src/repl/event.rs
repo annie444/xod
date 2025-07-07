@@ -14,10 +14,10 @@ impl ConditionalEventHandler for XodCompleteHintHandler {
             } else if *k == KeyEvent::alt('f') && ctx.line().len() == ctx.pos() {
                 let text = ctx.hint_text()?;
                 let mut start = 0;
-                if let Some(first) = text.chars().next() {
-                    if !first.is_alphanumeric() {
-                        start = text.find(|c: char| c.is_alphanumeric()).unwrap_or_default();
-                    }
+                if let Some(first) = text.chars().next()
+                    && !first.is_alphanumeric()
+                {
+                    start = text.find(|c: char| c.is_alphanumeric()).unwrap_or_default();
                 }
 
                 let text = text
