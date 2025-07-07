@@ -1,0 +1,16 @@
+[workspace]
+git_tag_name = "v{{ version }}"
+allow_dirty = true
+pr_labels = ["release"]
+publish_allow_dirty = true
+
+[changelog]
+link_parsers = [
+  # Extract all GitLab issues and PRs and generate URLs linking to them.
+  # The link text will be the matching pattern.
+  { pattern = "#(\\d+)", href = "https://github.com/annie444/xod/issues/$1" },
+  # Extract mentions of IETF RFCs and generate URLs linking to them.
+  # It also rewrites the text as "ietf-rfc...".
+  { pattern = "RFC(\\d+)", text = "ietf-rfc$1", href = "https://datatracker.ietf.org/doc/html/rfc$1" },
+]
+protect_breaking_commits = true
