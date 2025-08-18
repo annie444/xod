@@ -24,7 +24,7 @@ rustyline = { version = "16.0.0", features = [
   "derive",
 ] }
 shellexpand = "3.1.1"
-thiserror = "2.0.12"
+thiserror = "2.0.15"
 
 [profile.dev]
 debug = true
