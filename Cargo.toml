@@ -17,7 +17,7 @@ color-print = { version = "0.3.7", features = ["terminfo"] }
 nom = "8.0.0"
 nom_locate = { version = "5.0.0", features = ["runtime-dispatch-simd"] }
 prettytable-rs = "0.10.0"
-rustyline = { version = "16.0.0", features = [
+rustyline = { version = "17.0.1", features = [
   "case_insensitive_history_search",
   "with-fuzzy",
   "custom-bindings",
